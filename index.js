@@ -1,0 +1,228 @@
+//---------------------------------------------------------------------------------------------------------------------
+// Declarations
+
+const penColorPicker = document.querySelector("#penColorPicker");
+const backgroundColorPicker = document.querySelector("#backgroundColorPicker");
+const penButton = document.querySelector("#penButton");
+const eraserButton = document.querySelector("#eraserButton");
+const colorfulModeButton = document.querySelector("#colorfulModeButton");
+const shadingModeButton = document.querySelector("#shadingModeButton");
+const lightenModeButton = document.querySelector("#lightenModeButton");
+const gridSizeOutput = document.querySelector("#gridSize");
+const gridSizeSlider = document.querySelector("#gridSizeSlider");
+const gridLinesButton = document.querySelector("#gridLinesButton");
+const gridLinesStatus = document.querySelector("#gridLinesStatus");
+const clearButton = document.querySelector("#clearButton");
+const grid = document.querySelector("#grid");
+
+const pixels = [];
+const usedPixels = [];
+let drawingMode = "pen";
+let drawingModeButton = penButton;
+
+//---------------------------------------------------------------------------------------------------------------------
+// Functions
+
+function constructGrid() {
+    const gridSize = gridSizeSlider.value;
+    grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`
+    grid.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`
+
+    for (let i = 0; i < gridSize * gridSize; i++) {
+        pixels[i] = document.createElement("div");
+        pixels[i].classList.add("pixel");
+        pixels[i].style.backgroundColor = backgroundColorPicker.value;
+        grid.appendChild(pixels[i]);
+    }
+    
+    if (gridLinesStatus.textContent === "ON") {
+        addGridLines();
+    }
+
+    pixels.forEach(pixel => {
+        pixel.addEventListener("mousedown", draw);
+    });
+
+    pixels.forEach(pixel => {
+        pixel.addEventListener("mouseenter", event => {
+            if (event.buttons === 0) return;
+            draw(event);
+        });
+    });
+}
+
+function destructGrid() {
+    pixels.forEach(pixel => grid.removeChild(pixel));
+    pixels.length = 0;
+    usedPixels.length = 0; 
+}
+
+function addGridLines() {
+    const gridSize = gridSizeSlider.value;
+    let index = 0;
+
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            pixels[index].style.borderTop = "1px solid #9c9c9c";
+            pixels[index].style.borderLeft = "1px solid #9c9c9c";
+
+            if ((j+1) % gridSize === 0) {
+                pixels[index].style.borderRight = "1px solid #9c9c9c";
+            }
+            if ((i+1) % gridSize === 0) {
+                pixels[index].style.borderBottom = "1px solid #9c9c9c";
+            }
+
+            index++;
+        }
+    }
+}
+
+function removeGridLines() {
+    const gridSize = gridSizeSlider.value;
+    let index = 0;
+
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            pixels[index].style.removeProperty("border-top");
+            pixels[index].style.removeProperty("border-left");
+
+            if ((j+1) % gridSize === 0) {
+                pixels[index].style.removeProperty("border-right");
+            }
+            if ((i+1) % gridSize === 0) {
+                pixels[index].style.removeProperty("border-bottom");
+            }
+
+            index++;
+        }
+    }
+}
+
+function draw(event){
+    if (drawingMode === "pen") {
+        event.target.style.backgroundColor = penColorPicker.value;
+        if (!usedPixels.includes(event.target)){
+            usedPixels.push(event.target);
+        }
+    }
+    else if (drawingMode === "eraser") {
+        if (!usedPixels.includes(event.target)) return;
+        event.target.style.backgroundColor = backgroundColorPicker.value;
+        const index = usedPixels.indexOf(event.target);
+        usedPixels.splice(index,1);
+    }
+    else if (drawingMode === "colorful") {
+        event.target.style.backgroundColor = getRandomColor();
+        if (!usedPixels.includes(event.target)){
+            usedPixels.push(event.target);
+        }
+    }
+    else if (drawingMode === "shading") {
+        if (!usedPixels.includes(event.target)){
+            usedPixels.push(event.target);
+        }
+        event.target.style.backgroundColor = shade(event.target.style.backgroundColor);
+    }
+    else if (drawingMode === "lighten") {
+        if (!usedPixels.includes(event.target)){
+            usedPixels.push(event.target);
+        }
+        event.target.style.backgroundColor = lighten(event.target.style.backgroundColor);
+    }
+}
+
+function getRandomColor() {
+    const R = Math.floor(Math.random() * 256);
+    const G = Math.floor(Math.random() * 256);
+    const B = Math.floor(Math.random() * 256);
+    return `rgb(${R}, ${G}, ${B})`;
+}
+
+function changeDrawingMode(newDrawingMode, newDrawingModeButton) {
+    drawingMode = newDrawingMode;
+    drawingModeButton.classList.remove("button-on");
+    drawingModeButton = newDrawingModeButton;
+    drawingModeButton.classList.add("button-on");
+}
+
+function shade(color) {
+    const rgbArray= color.substring(4,color.length-1).split(',');
+    return `rgb(${rgbArray[0] - 25}, ${rgbArray[1] - 25}, ${rgbArray[2] - 25})`;
+}
+
+function lighten(color) {
+    const rgbArray= color.substring(4,color.length-1).split(',');
+    console.log(rgbArray);
+    return `rgb(${+rgbArray[0] + 25}, ${+rgbArray[1] + 25}, ${+rgbArray[2] + 25})`;
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+//Event listeners 
+
+gridSizeSlider.addEventListener("input", () => {
+    destructGrid();
+    constructGrid();
+    gridSizeOutput.textContent = `${gridSizeSlider.value} X ${gridSizeSlider.value}`
+});
+
+gridLinesButton.addEventListener("click", () => {
+    gridLinesButton.classList.toggle("button-on");
+
+    if (gridLinesStatus.textContent === "OFF"){
+        gridLinesStatus.textContent = "ON";
+        addGridLines();
+    }
+    else {
+        gridLinesStatus.textContent = "OFF";
+        removeGridLines();
+    }
+});
+
+clearButton.addEventListener("click", () => {
+    clearButton.classList.add("button-on");
+    destructGrid();
+    constructGrid();
+});
+
+clearButton.addEventListener("transitionend", () => {
+    clearButton.classList.remove("button-on");
+});
+
+backgroundColorPicker.addEventListener("input", () => {
+    const blankPixels = pixels.filter(pixel => !usedPixels.includes(pixel));
+
+    blankPixels.forEach(pixel => {
+        pixel.style.backgroundColor = backgroundColorPicker.value;
+    });
+});
+
+penButton.addEventListener("click", () => {
+    changeDrawingMode("pen", penButton);
+});
+
+eraserButton.addEventListener("click", () => {
+    changeDrawingMode("eraser", eraserButton);
+});
+
+colorfulModeButton.addEventListener("click", () => {
+    changeDrawingMode("colorful", colorfulModeButton);
+});
+
+shadingModeButton.addEventListener("click", () => {
+    changeDrawingMode("shading", shadingModeButton);
+});
+
+lightenModeButton.addEventListener("click", () => {
+    changeDrawingMode("lighten", lightenModeButton);
+});
+
+//---------------------------------------------------------------------------------------------------------------------
+// Date in footer
+
+const currentYearOutput = document.querySelector("#currentYear");
+currentYearOutput.textContent = new Date().getFullYear();
+
+//---------------------------------------------------------------------------------------------------------------------
+
+constructGrid();

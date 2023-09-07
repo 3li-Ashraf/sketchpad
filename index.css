@@ -1,0 +1,148 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    background-color: #181818;
+    font-family: 'Roboto', sans-serif;
+}
+
+.header {
+    padding: 30px 0;
+    text-align: center;
+    font-family: 'Press Start 2P', cursive;
+}
+
+.title {
+    font-size: 50px;
+    font-weight: 400;
+    color: #3ea6ff;
+}
+
+.main {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 150px;
+    flex: auto;
+}
+
+.settings {
+    width: 302px;
+    height: 702px;
+    color: #3ea6ff;
+    background-color: #202020;
+    border: 1px solid #3ea6ff;
+    border-radius: 4px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.drawing-settings,
+.grid-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.settings-title {
+    margin: 5px 0;
+    font-size: 15px;
+    font-family: 'Press Start 2P', cursive;
+}
+
+.pen-color-container,
+.background-color-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+input[type="color"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 50px;
+    height: 50px;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
+}
+
+input[type="color"]::-moz-color-swatch {
+    border: none;
+    border-radius: 4px;
+}
+
+.pen-eraser-container {
+    display: flex;
+    gap: 10px;
+}
+
+.pen-eraser-container button {
+    flex: 1;
+}
+
+.settings-button {
+    color: #3ea6ff;
+    background-color: #202020;
+    border: 1px solid #3ea6ff;
+    font-size: 14px;
+    padding: 9px 15px;
+    cursor: pointer;
+}
+
+#clearButton {
+    transition: color 0.1s, background-color 0.1s;
+}
+
+.button-on {
+    color: #202020;
+    background-color: #3ea6ff;
+}
+
+input[type="range"] {
+    height: 2px;
+    cursor: grab;
+}
+
+.grid-container {
+    width: 704px;
+    height: 704px;
+    background-color: #202020;
+    border: 1px solid #3ea6ff;
+    border-radius: 4px;
+    display: flex;
+    padding: 30px;
+    user-select: none;
+}
+
+#grid {
+    flex: 1;
+    background-color: white;
+    border: 1px solid #9c9c9c;
+    display: grid;
+}
+
+.footer {
+    padding: 10px 0;
+    font-size: 18px;
+    color: #3ea6ff;
+    text-align: center;
+}

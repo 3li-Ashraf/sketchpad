@@ -40,13 +40,15 @@ function constructGrid() {
     }
 
     pixels.forEach(pixel => {
-        pixel.addEventListener("mousedown", draw);
+        pixel.addEventListener("mousedown", event => {
+            draw(event.target);
+        });
     });
 
     pixels.forEach(pixel => {
         pixel.addEventListener("mouseenter", event => {
             if (event.buttons === 0) return;
-            draw(event);
+            draw(event.target);
         });
     });
 }
@@ -99,36 +101,36 @@ function removeGridLines() {
     }
 }
 
-function draw(event){
+function draw(pixel){
     if (drawingMode === "pen") {
-        event.target.style.backgroundColor = penColorPicker.value;
-        if (!usedPixels.includes(event.target)){
-            usedPixels.push(event.target);
+        pixel.style.backgroundColor = penColorPicker.value;
+        if (!usedPixels.includes(pixel)){
+            usedPixels.push(pixel);
         }
     }
     else if (drawingMode === "eraser") {
-        if (!usedPixels.includes(event.target)) return;
-        event.target.style.backgroundColor = backgroundColorPicker.value;
-        const index = usedPixels.indexOf(event.target);
+        if (!usedPixels.includes(pixel)) return;
+        pixel.style.backgroundColor = backgroundColorPicker.value;
+        const index = usedPixels.indexOf(pixel);
         usedPixels.splice(index,1);
     }
     else if (drawingMode === "colorful") {
-        event.target.style.backgroundColor = getRandomColor();
-        if (!usedPixels.includes(event.target)){
-            usedPixels.push(event.target);
+        pixel.style.backgroundColor = getRandomColor();
+        if (!usedPixels.includes(pixel)){
+            usedPixels.push(pixel);
         }
     }
     else if (drawingMode === "shading") {
-        if (!usedPixels.includes(event.target)){
-            usedPixels.push(event.target);
+        if (!usedPixels.includes(pixel)){
+            usedPixels.push(pixel);
         }
-        event.target.style.backgroundColor = shade(event.target.style.backgroundColor);
+        pixel.style.backgroundColor = shade(pixel.style.backgroundColor);
     }
     else if (drawingMode === "lighten") {
-        if (!usedPixels.includes(event.target)){
-            usedPixels.push(event.target);
+        if (!usedPixels.includes(pixel)){
+            usedPixels.push(pixel);
         }
-        event.target.style.backgroundColor = lighten(event.target.style.backgroundColor);
+        pixel.style.backgroundColor = lighten(pixel.style.backgroundColor);
     }
 }
 
@@ -148,6 +150,7 @@ function lighten(color) {
     const rgbArray= color.substring(4,color.length-1).split(',');
     return `rgb(${+rgbArray[0] + 25}, ${+rgbArray[1] + 25}, ${+rgbArray[2] + 25})`;
 }
+
 function changeDrawingMode(newDrawingMode, newDrawingModeButton) {
     drawingMode = newDrawingMode;
     drawingModeButton.classList.remove("button-on");

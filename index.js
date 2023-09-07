@@ -139,13 +139,6 @@ function getRandomColor() {
     return `rgb(${R}, ${G}, ${B})`;
 }
 
-function changeDrawingMode(newDrawingMode, newDrawingModeButton) {
-    drawingMode = newDrawingMode;
-    drawingModeButton.classList.remove("button-on");
-    drawingModeButton = newDrawingModeButton;
-    drawingModeButton.classList.add("button-on");
-}
-
 function shade(color) {
     const rgbArray= color.substring(4,color.length-1).split(',');
     return `rgb(${rgbArray[0] - 25}, ${rgbArray[1] - 25}, ${rgbArray[2] - 25})`;
@@ -153,8 +146,13 @@ function shade(color) {
 
 function lighten(color) {
     const rgbArray= color.substring(4,color.length-1).split(',');
-    console.log(rgbArray);
     return `rgb(${+rgbArray[0] + 25}, ${+rgbArray[1] + 25}, ${+rgbArray[2] + 25})`;
+}
+function changeDrawingMode(newDrawingMode, newDrawingModeButton) {
+    drawingMode = newDrawingMode;
+    drawingModeButton.classList.remove("button-on");
+    drawingModeButton = newDrawingModeButton;
+    drawingModeButton.classList.add("button-on");
 }
 
 //---------------------------------------------------------------------------------------------------------------------

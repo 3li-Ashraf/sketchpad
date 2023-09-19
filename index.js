@@ -43,9 +43,7 @@ function constructGrid() {
         pixel.addEventListener("mousedown", event => {
             draw(event.target);
         });
-    });
 
-    pixels.forEach(pixel => {
         pixel.addEventListener("mouseenter", event => {
             if (event.buttons === 0) return;
             draw(event.target);
@@ -101,37 +99,43 @@ function removeGridLines() {
     }
 }
 
-function draw(pixel){
-    if (drawingMode === "pen") {
+function draw(pixel) {
+   switch (drawingMode) {
+    case "pen":
         pixel.style.backgroundColor = penColorPicker.value;
-        if (!usedPixels.includes(pixel)){
+        if (!usedPixels.includes(pixel)) {
             usedPixels.push(pixel);
         }
-    }
-    else if (drawingMode === "eraser") {
+        break;
+
+    case "eraser":
         if (!usedPixels.includes(pixel)) return;
         pixel.style.backgroundColor = backgroundColorPicker.value;
         const index = usedPixels.indexOf(pixel);
         usedPixels.splice(index,1);
-    }
-    else if (drawingMode === "colorful") {
+        break;
+
+    case "colorful":
         pixel.style.backgroundColor = getRandomColor();
-        if (!usedPixels.includes(pixel)){
+        if (!usedPixels.includes(pixel)) {
             usedPixels.push(pixel);
         }
-    }
-    else if (drawingMode === "shading") {
-        if (!usedPixels.includes(pixel)){
-            usedPixels.push(pixel);
-        }
+        break;
+
+    case "shading":
         pixel.style.backgroundColor = shade(pixel.style.backgroundColor);
-    }
-    else if (drawingMode === "lighten") {
-        if (!usedPixels.includes(pixel)){
+        if (!usedPixels.includes(pixel)) {
             usedPixels.push(pixel);
         }
+        break;
+
+    case "lighten":
         pixel.style.backgroundColor = lighten(pixel.style.backgroundColor);
-    }
+        if (!usedPixels.includes(pixel)) {
+            usedPixels.push(pixel);
+        }
+        break;
+   }
 }
 
 function getRandomColor() {
@@ -170,7 +174,7 @@ gridSizeSlider.addEventListener("input", () => {
 gridLinesButton.addEventListener("click", () => {
     gridLinesButton.classList.toggle("button-on");
 
-    if (gridLinesStatus.textContent === "OFF"){
+    if (gridLinesStatus.textContent === "OFF") {
         gridLinesStatus.textContent = "ON";
         addGridLines();
     }

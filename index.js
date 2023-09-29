@@ -40,9 +40,7 @@ function constructGrid() {
     }
 
     pixels.forEach(pixel => {
-        pixel.addEventListener("mousedown", event => {
-            draw(event.target);
-        });
+        pixel.addEventListener("mousedown", event => draw(event.target));
 
         pixel.addEventListener("mouseenter", event => {
             if (event.buttons === 0) return;

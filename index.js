@@ -137,14 +137,14 @@ function getRandomColor() {
 
 function shade(color) {
     const [R, G, B] = color
-                    .substring(4,color.length-1)
+                    .slice(4, -1)
                     .split(',');
     return `rgb(${R - 25}, ${G - 25}, ${B - 25})`;
 }
 
 function lighten(color) {
     const [R, G, B] = color
-                    .substring(4,color.length-1)
+                    .slice(4, -1)
                     .split(',');
     return `rgb(${+R + 25}, ${+G + 25}, ${+B + 25})`;
 }

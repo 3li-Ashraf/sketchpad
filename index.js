@@ -103,37 +103,28 @@ function draw(pixel) {
    switch (drawingMode) {
     case "pen":
         pixel.style.backgroundColor = penColorPicker.value;
-        if (!usedPixels.includes(pixel)) {
-            usedPixels.push(pixel);
-        }
+        usedPixels.add(pixel);
         break;
 
     case "eraser":
         if (!usedPixels.includes(pixel)) return;
         pixel.style.backgroundColor = backgroundColorPicker.value;
-        const index = usedPixels.indexOf(pixel);
-        usedPixels.splice(index,1);
+        usedPixels.remove(pixel);
         break;
 
     case "colorful":
         pixel.style.backgroundColor = getRandomColor();
-        if (!usedPixels.includes(pixel)) {
-            usedPixels.push(pixel);
-        }
+        usedPixels.add(pixel);
         break;
 
     case "shading":
         pixel.style.backgroundColor = shade(pixel.style.backgroundColor);
-        if (!usedPixels.includes(pixel)) {
-            usedPixels.push(pixel);
-        }
+        usedPixels.add(pixel);
         break;
 
     case "lighten":
         pixel.style.backgroundColor = lighten(pixel.style.backgroundColor);
-        if (!usedPixels.includes(pixel)) {
-            usedPixels.push(pixel);
-        }
+        usedPixels.add(pixel);
         break;
    }
 }
@@ -160,6 +151,17 @@ function changeDrawingMode(newDrawingMode, newDrawingModeButton) {
     drawingModeButton.classList.remove("button-on");
     drawingModeButton = newDrawingModeButton;
     drawingModeButton.classList.add("button-on");
+}
+
+usedPixels.add = function(pixel) {
+    if (this.includes(pixel)) return;
+    this.push(pixel);
+}
+
+usedPixels.remove = function(pixel) {
+    if (!this.includes(pixel)) return;
+    const index = usedPixels.indexOf(pixel);
+    usedPixels.splice(index,1);
 }
 
 //---------------------------------------------------------------------------------------------------------------------

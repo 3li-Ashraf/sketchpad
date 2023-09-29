@@ -63,11 +63,11 @@ function addGridLines() {
             pixels[index].style.borderTop = "1px solid #9c9c9c";
             pixels[index].style.borderLeft = "1px solid #9c9c9c";
 
-            if (column === gridSize) {
+            if (column == gridSize) {
                 pixels[index].style.borderRight = "1px solid #9c9c9c";
             }
 
-            if (row === gridSize) {
+            if (row == gridSize) {
                 pixels[index].style.borderBottom = "1px solid #9c9c9c";
             }
 
@@ -85,11 +85,11 @@ function removeGridLines() {
             pixels[index].style.removeProperty("border-top");
             pixels[index].style.removeProperty("border-left");
 
-            if (column === gridSize) {
+            if (column == gridSize) {
                 pixels[index].style.removeProperty("border-right");
             }
             
-            if (row === gridSize) {
+            if (row == gridSize) {
                 pixels[index].style.removeProperty("border-bottom");
             }
 

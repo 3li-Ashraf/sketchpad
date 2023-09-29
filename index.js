@@ -61,15 +61,15 @@ function addGridLines() {
     const gridSize = gridSizeSlider.value;
     let index = 0;
 
-    for (let i = 0; i < gridSize; i++) {
-        for (let j = 0; j < gridSize; j++) {
+    for (let row = 1; row <= gridSize; row++) {
+        for (let column = 1; column <= gridSize; column++) {
             pixels[index].style.borderTop = "1px solid #9c9c9c";
             pixels[index].style.borderLeft = "1px solid #9c9c9c";
 
-            if ((j+1) % gridSize === 0) {
+            if (column % gridSize === 0) {
                 pixels[index].style.borderRight = "1px solid #9c9c9c";
             }
-            if ((i+1) % gridSize === 0) {
+            if (row % gridSize === 0) {
                 pixels[index].style.borderBottom = "1px solid #9c9c9c";
             }
 
@@ -82,15 +82,15 @@ function removeGridLines() {
     const gridSize = gridSizeSlider.value;
     let index = 0;
 
-    for (let i = 0; i < gridSize; i++) {
-        for (let j = 0; j < gridSize; j++) {
+    for (let row = 1; row <= gridSize; row++) {
+        for (let column = 1; column <= gridSize; column++) {
             pixels[index].style.removeProperty("border-top");
             pixels[index].style.removeProperty("border-left");
 
-            if ((j+1) % gridSize === 0) {
+            if (column % gridSize === 0) {
                 pixels[index].style.removeProperty("border-right");
             }
-            if ((i+1) % gridSize === 0) {
+            if (row % gridSize === 0) {
                 pixels[index].style.removeProperty("border-bottom");
             }
 

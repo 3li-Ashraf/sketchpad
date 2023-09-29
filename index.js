@@ -41,7 +41,6 @@ function constructGrid() {
 
     pixels.forEach(pixel => {
         pixel.addEventListener("mousedown", event => draw(event.target));
-
         pixel.addEventListener("mouseenter", event => {
             if (event.buttons === 0) return;
             draw(event.target);
@@ -67,6 +66,7 @@ function addGridLines() {
             if (column % gridSize === 0) {
                 pixels[index].style.borderRight = "1px solid #9c9c9c";
             }
+
             if (row % gridSize === 0) {
                 pixels[index].style.borderBottom = "1px solid #9c9c9c";
             }
@@ -88,6 +88,7 @@ function removeGridLines() {
             if (column % gridSize === 0) {
                 pixels[index].style.removeProperty("border-right");
             }
+            
             if (row % gridSize === 0) {
                 pixels[index].style.removeProperty("border-bottom");
             }
@@ -135,13 +136,17 @@ function getRandomColor() {
 }
 
 function shade(color) {
-    const rgbArray= color.substring(4,color.length-1).split(',');
-    return `rgb(${rgbArray[0] - 25}, ${rgbArray[1] - 25}, ${rgbArray[2] - 25})`;
+    const [R, G, B] = color
+                    .substring(4,color.length-1)
+                    .split(',');
+    return `rgb(${R - 25}, ${G - 25}, ${B - 25})`;
 }
 
 function lighten(color) {
-    const rgbArray= color.substring(4,color.length-1).split(',');
-    return `rgb(${+rgbArray[0] + 25}, ${+rgbArray[1] + 25}, ${+rgbArray[2] + 25})`;
+    const [R, G, B] = color
+                    .substring(4,color.length-1)
+                    .split(',');
+    return `rgb(${+R + 25}, ${+G + 25}, ${+B + 25})`;
 }
 
 function changeDrawingMode(newDrawingMode, newDrawingModeButton) {

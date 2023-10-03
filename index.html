@@ -18,8 +18,8 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap" rel="stylesheet">
         <!-- Linked files -->
-        <link rel="stylesheet" href="index.css">
-        <script src="index.js" defer></script>
+        <link rel="stylesheet" href="styles.css">
+        <script src="script.js" defer></script>
     </head>
     <body>
         <!-- Header -->
@@ -42,7 +42,7 @@
                         <span>Background Color</span>
                     </div>
                     <div class="pen-eraser-container">
-                        <button class="settings-button button-on" id="penButton">Pen</button>
+                        <button class="settings-button" id="penButton">Pen</button>
                         <button class="settings-button" id="eraserButton">Eraser</button>
                     </div>
                     <button class="settings-button" id="colorfulModeButton">Colorful Mode</button>
@@ -52,9 +52,9 @@
                 <!-- Grid Settings -->
                 <div class="grid-settings">
                     <h2 class="settings-title">Grid Settings</h2>
-                    <p>Grid size: <span id="gridSize">32 X 32</span></p>
+                    <p>Grid size: <span id="gridSize"></span></p>
                     <input type="range" min="1" max="64" value="32" id="gridSizeSlider">
-                    <button class="settings-button button-on" id="gridLinesButton">Grid Lines: <span id="gridLinesStatus">ON</span></button>
+                    <button class="settings-button" id="gridLinesButton">Grid Lines: <span id="gridLinesStatus"></span></button>
                     <button class="settings-button" id="clearButton">Clear</button>
                 </div>
             </div>

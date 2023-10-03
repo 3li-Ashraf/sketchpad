@@ -11,12 +11,13 @@ const lightenModeButton = document.querySelector("#lightenModeButton");
 const gridSizeOutput = document.querySelector("#gridSize");
 const gridSizeSlider = document.querySelector("#gridSizeSlider");
 const gridLinesButton = document.querySelector("#gridLinesButton");
-const gridLinesStatus = document.querySelector("#gridLinesStatus");
+const gridLinesStatusOutput = document.querySelector("#gridLinesStatus");
 const clearButton = document.querySelector("#clearButton");
 const grid = document.querySelector("#grid");
 
 const pixels = [];
 const usedPixels = [];
+let gridLinesStatus = "ON";
 let drawingMode = "pen";
 let drawingModeButton = penButton;
 
@@ -30,12 +31,11 @@ function constructGrid() {
 
     for (let i = 0; i < gridSize * gridSize; i++) {
         pixels[i] = document.createElement("div");
-        pixels[i].classList.add("pixel");
         pixels[i].style.backgroundColor = backgroundColorPicker.value;
         grid.appendChild(pixels[i]);
     }
     
-    if (gridLinesStatus.textContent === "ON") {
+    if (gridLinesStatus === "ON") {
         addGridLines();
     }
 
@@ -54,19 +54,28 @@ function destructGrid() {
     usedPixels.length = 0; 
 }
 
+function clearGrid() {
+    destructGrid();
+    constructGrid();
+}
+
 function addGridLines() {
     const gridSize = gridSizeSlider.value;
     let index = 0;
 
     for (let row = 1; row <= gridSize; row++) {
         for (let column = 1; column <= gridSize; column++) {
+
+            // To avoid double borders, top and left borders are applied to every pixel
             pixels[index].style.borderTop = "1px solid #9c9c9c";
             pixels[index].style.borderLeft = "1px solid #9c9c9c";
 
+            // Add a right border the the right most pixels
             if (column == gridSize) {
                 pixels[index].style.borderRight = "1px solid #9c9c9c";
             }
 
+            // Add a bottom border to the bottom most pixels
             if (row == gridSize) {
                 pixels[index].style.borderBottom = "1px solid #9c9c9c";
             }
@@ -98,6 +107,24 @@ function removeGridLines() {
     }
 }
 
+function toggleGridLines() {
+    gridLinesButton.classList.toggle("button-on");
+
+    switch (gridLinesStatus) {
+        case "ON":
+            removeGridLines();
+            gridLinesStatus = "OFF";
+            gridLinesStatusOutput.textContent = "OFF";
+            break;
+
+        case "OFF":
+            addGridLines();
+            gridLinesStatus = "ON";
+            gridLinesStatusOutput.textContent = "ON";
+            break;
+    }
+}
+
 function draw(pixel) {
    switch (drawingMode) {
     case "pen":
@@ -117,12 +144,12 @@ function draw(pixel) {
         break;
 
     case "shading":
-        pixel.style.backgroundColor = shade(pixel.style.backgroundColor);
+        pixel.style.backgroundColor = shadeOrLightenColor(pixel.style.backgroundColor, "shade");
         usedPixels.add(pixel);
         break;
 
     case "lighten":
-        pixel.style.backgroundColor = lighten(pixel.style.backgroundColor);
+        pixel.style.backgroundColor = shadeOrLightenColor(pixel.style.backgroundColor, "lighten");
         usedPixels.add(pixel);
         break;
    }
@@ -135,18 +162,16 @@ function getRandomColor() {
     return `rgb(${R}, ${G}, ${B})`;
 }
 
-function shade(color) {
-    const [R, G, B] = color
-                    .slice(4, -1)
-                    .split(", ");
-    return `rgb(${R - 25}, ${G - 25}, ${B - 25})`;
-}
+function shadeOrLightenColor(color, option) {
+    const [R, G, B] = color.slice(4, -1).split(", ");
 
-function lighten(color) {
-    const [R, G, B] = color
-                    .slice(4, -1)
-                    .split(", ");
-    return `rgb(${+R + 25}, ${+G + 25}, ${+B + 25})`;
+    switch (option) {
+        case "shade":
+            return `rgb(${R - 25}, ${G - 25}, ${B - 25})`;
+
+        case "lighten":
+            return `rgb(${+R + 25}, ${+G + 25}, ${+B + 25})`;
+    }
 }
 
 function changeDrawingMode(newDrawingMode, newDrawingModeButton) {
@@ -168,36 +193,7 @@ usedPixels.remove = function(pixel) {
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-//Event listeners 
-
-gridSizeSlider.addEventListener("input", () => {
-    destructGrid();
-    constructGrid();
-    gridSizeOutput.textContent = `${gridSizeSlider.value} X ${gridSizeSlider.value}`
-});
-
-gridLinesButton.addEventListener("click", () => {
-    gridLinesButton.classList.toggle("button-on");
-
-    if (gridLinesStatus.textContent === "OFF") {
-        gridLinesStatus.textContent = "ON";
-        addGridLines();
-    }
-    else {
-        gridLinesStatus.textContent = "OFF";
-        removeGridLines();
-    }
-});
-
-clearButton.addEventListener("click", () => {
-    clearButton.classList.add("button-on");
-    destructGrid();
-    constructGrid();
-});
-
-clearButton.addEventListener("transitionend", () => {
-    clearButton.classList.remove("button-on");
-});
+//Event listeners
 
 backgroundColorPicker.addEventListener("input", () => {
     const blankPixels = pixels.filter(pixel => !usedPixels.includes(pixel));
@@ -227,12 +223,32 @@ lightenModeButton.addEventListener("click", () => {
     changeDrawingMode("lighten", lightenModeButton);
 });
 
+gridSizeSlider.addEventListener("input", () => {
+    clearGrid();
+    gridSizeOutput.textContent = `${gridSizeSlider.value} X ${gridSizeSlider.value}`;
+});
+
+gridLinesButton.addEventListener("click", toggleGridLines);
+
+clearButton.addEventListener("click", () => {
+    clearGrid();
+    clearButton.classList.add("button-on");
+});
+
+clearButton.addEventListener("transitionend", () => {
+    clearButton.classList.remove("button-on");
+});
+
+window.addEventListener("load", () => {
+    constructGrid();
+    drawingModeButton.classList.add("button-on");
+    gridLinesStatusOutput.textContent = gridLinesStatus;
+    if (gridLinesStatus === "ON") gridLinesButton.classList.add("button-on");
+    gridSizeOutput.textContent = `${gridSizeSlider.value} X ${gridSizeSlider.value}`;
+});
+
 //---------------------------------------------------------------------------------------------------------------------
 // Date in footer
 
 const currentYearOutput = document.querySelector("#currentYear");
 currentYearOutput.textContent = new Date().getFullYear();
-
-//---------------------------------------------------------------------------------------------------------------------
-
-constructGrid();

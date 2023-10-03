@@ -247,8 +247,8 @@ gridSizeSlider.addEventListener("input", () => {
 gridLinesButton.addEventListener("click", toggleGridLines);
 
 clearButton.addEventListener("click", () => {
-    clearGrid();
     clearButton.classList.add("button-on");
+    clearGrid();
 });
 
 clearButton.addEventListener("transitionend", () => {
@@ -256,8 +256,8 @@ clearButton.addEventListener("transitionend", () => {
 });
 
 screenshotButton.addEventListener("click", () => {
-    screenshot();
     screenshotButton.classList.add("button-on");
+    screenshot();
 });
 
 screenshotButton.addEventListener("transitionend", () => {

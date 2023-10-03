@@ -53,7 +53,7 @@ body {
 .grid-settings {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 15px;
 }
 
 .settings-title {
@@ -108,7 +108,8 @@ input[type="color"]::-moz-color-swatch {
     cursor: pointer;
 }
 
-#clearButton {
+#clearButton,
+#screenshotButton {
     transition: color 0.1s, background-color 0.1s;
 }
 

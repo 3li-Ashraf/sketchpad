@@ -12,6 +12,7 @@ const gridSizeOutput = document.querySelector("#gridSize");
 const gridSizeSlider = document.querySelector("#gridSizeSlider");
 const gridLinesButton = document.querySelector("#gridLinesButton");
 const gridLinesStatusOutput = document.querySelector("#gridLinesStatus");
+const screenshotButton = document.querySelector("#screenshotButton");
 const clearButton = document.querySelector("#clearButton");
 const grid = document.querySelector("#grid");
 
@@ -181,6 +182,21 @@ function changeDrawingMode(newDrawingMode, newDrawingModeButton) {
     drawingModeButton.classList.add("button-on");
 }
 
+function screenshot() {
+    html2canvas(grid).then(canvas => {
+        // Convert the canvas to an image data URL
+        const screenshotDataUrl = canvas.toDataURL("image/png");
+
+        // Create a link to download the screenshot
+        const downloadLink = document.createElement('a');
+        downloadLink.href = screenshotDataUrl;
+        downloadLink.download = "screenshot.png";
+
+        // Trigger the download
+        downloadLink.click();
+    });
+}
+
 usedPixels.add = function(pixel) {
     if (this.includes(pixel)) return;
     this.push(pixel);
@@ -237,6 +253,15 @@ clearButton.addEventListener("click", () => {
 
 clearButton.addEventListener("transitionend", () => {
     clearButton.classList.remove("button-on");
+});
+
+screenshotButton.addEventListener("click", () => {
+    screenshot();
+    screenshotButton.classList.add("button-on");
+});
+
+screenshotButton.addEventListener("transitionend", () => {
+    screenshotButton.classList.remove("button-on");
 });
 
 window.addEventListener("load", () => {

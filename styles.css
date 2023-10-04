@@ -53,7 +53,7 @@ body {
 .grid-settings {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 13px;
 }
 
 .settings-title {
@@ -90,12 +90,14 @@ input[type="color"]::-moz-color-swatch {
     border-radius: 4px;
 }
 
-.pen-eraser-container {
+.pen-eraser-container,
+.undo-redo-container {
     display: flex;
     gap: 10px;
 }
 
-.pen-eraser-container button {
+.pen-eraser-container button,
+.undo-redo-container button {
     flex: 1;
 }
 
@@ -108,6 +110,8 @@ input[type="color"]::-moz-color-swatch {
     cursor: pointer;
 }
 
+#undoButton,
+#redoButton,
 #clearButton,
 #screenshotButton {
     transition: color 0.1s, background-color 0.1s;

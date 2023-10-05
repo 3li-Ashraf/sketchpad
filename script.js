@@ -203,6 +203,7 @@ function undo() {
 
         case "used":
         case "erased":
+            usedPixels.add(object.pixel);
             object.pixel.style.backgroundColor = object.color;
             break;
     }

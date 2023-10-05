@@ -348,6 +348,20 @@ screenshotButton.addEventListener("transitionend", () => {
     screenshotButton.classList.remove("button-on");
 });
 
+document.addEventListener("keydown", event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+      event.preventDefault();
+      undoButton.click();
+    }
+});
+
+document.addEventListener("keydown", event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
+      event.preventDefault();
+      redoButton.click();
+    }
+});
+
 window.addEventListener("load", () => {
     constructGrid();
     drawingModeButton.classList.add("button-on");

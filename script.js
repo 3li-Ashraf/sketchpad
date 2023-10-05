@@ -349,14 +349,14 @@ screenshotButton.addEventListener("transitionend", () => {
 });
 
 document.addEventListener("keydown", event => {
-    if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+    if ((event.ctrlKey || event.metaKey) && event.code === "KeyZ") {
       event.preventDefault();
       undoButton.click();
     }
 });
 
 document.addEventListener("keydown", event => {
-    if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
+    if ((event.ctrlKey || event.metaKey) && event.code === "KeyY") {
       event.preventDefault();
       redoButton.click();
     }

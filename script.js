@@ -371,31 +371,6 @@ window.addEventListener("load", () => {
     penColorPicker.rgbValue = hex2rgb(penColorPicker.value);
 });
 
-//-------------------------------------------------------------------------------------------------------
-// Simulate button click
-
-let isMouseDown = false;
-let buttonPressInterval;
-
-function simulateButtonClick(btn) {
-    btn.click();
-}
-
-undoButton.addEventListener('mousedown', () => {
-    isMouseDown = true;
-    buttonPressInterval = setInterval(() => simulateButtonClick(undoButton), 100);
-});
-
-redoButton.addEventListener('mousedown', () => {
-    isMouseDown = true;
-    buttonPressInterval = setInterval(() => simulateButtonClick(redoButton), 100);
-});
-
-window.addEventListener('mouseup', () => {
-    isMouseDown = false;
-    clearInterval(buttonPressInterval);
-});
-
 //---------------------------------------------------------------------------------------------------------------------
 // Date in footer
 

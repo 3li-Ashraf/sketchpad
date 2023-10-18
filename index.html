@@ -1,78 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Sketchpad</title>
-        <!-- Favicon -->
-        <link rel="apple-touch-icon" sizes="180x180" href="./favicon/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="./favicon/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="./favicon/favicon-16x16.png">
-        <link rel="manifest" href="./favicon/site.webmanifest">
-        <link rel="mask-icon" href="./favicon/safari-pinned-tab.svg" color="#5bbad5">
-        <link rel="shortcut icon" href="./favicon/favicon.ico">
-        <meta name="msapplication-TileColor" content="#ffffff">
-        <meta name="msapplication-config" content="./favicon/browserconfig.xml">
-        <meta name="theme-color" content="#ffffff">
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap" rel="stylesheet">
-        <!-- HTML2Canvas library -->
-        <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-        <!-- Styles and Script files -->
-        <link rel="stylesheet" href="styles.css">
-        <script src="script.js" defer></script>
-    </head>
-    <body>
-        <!-- Header -->
-        <div class="header">
-            <h1 class="title">Sketchpad</h1>
-        </div>
-        <!-- Main -->
-        <div class="main">
-            <!-- Settings -->
-            <div class="settings">
-                <!-- Drawing Settings -->
-                <div class="drawing-settings">
-                    <h2 class="settings-title">Drawing Settings</h2>
-                    <div class="pen-color-container">
-                        <input type="color" id="penColorPicker">
-                        <span>Pen Color</span>
-                    </div>
-                    <div class="background-color-container">
-                        <input type="color" value="#ffffff" id="backgroundColorPicker">
-                        <span>Background Color</span>
-                    </div>
-                    <div class="pen-eraser-container">
-                        <button class="settings-button" id="penButton">Pen</button>
-                        <button class="settings-button" id="eraserButton">Eraser</button>
-                    </div>
-                    <button class="settings-button" id="colorfulModeButton">Colorful Mode</button>
-                    <button class="settings-button" id="shadingModeButton">Shading Mode</button>
-                    <button class="settings-button" id="lightenModeButton">Lighten Mode</button>
-                    <div class="undo-redo-container">
-                        <button class="settings-button" id="undoButton">Undo</button>
-                        <button class="settings-button" id="redoButton">Redo</button>
-                    </div>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Sketchpad</title>
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="./favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon/favicon-16x16.png">
+    <link rel="manifest" href="./favicon/site.webmanifest">
+    <link rel="mask-icon" href="./favicon/safari-pinned-tab.svg" color="#5bbad5">
+    <link rel="shortcut icon" href="./favicon/favicon.ico">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="./favicon/browserconfig.xml">
+    <meta name="theme-color" content="#ffffff">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap"
+        rel="stylesheet">
+    <!-- HTML2Canvas library -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <!-- Styles and Script files -->
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js" defer></script>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1 class="title">Sketchpad</h1>
+    </div>
+    <!-- Main -->
+    <div class="main">
+        <!-- Settings -->
+        <div class="settings">
+            <!-- Drawing Settings -->
+            <div class="drawing-settings">
+                <h2 class="settings-title">Drawing Settings</h2>
+                <div class="pen-color-container">
+                    <input type="color" id="penColorPicker">
+                    <span>Pen Color</span>
                 </div>
-                <!-- Grid Settings -->
-                <div class="grid-settings">
-                    <h2 class="settings-title">Grid Settings</h2>
-                    <p>Grid size: <span id="gridSize"></span></p>
-                    <input type="range" min="1" max="64" value="32" id="gridSizeSlider">
-                    <button class="settings-button" id="gridLinesButton">Grid Lines: <span id="gridLinesStatus"></span></button>
-                    <button class="settings-button" id="screenshotButton">Screenshot</button>
-                    <button class="settings-button" id="clearButton">Clear</button>
+                <div class="background-color-container">
+                    <input type="color" value="#ffffff" id="backgroundColorPicker">
+                    <span>Background Color</span>
+                </div>
+                <div class="pen-eraser-container">
+                    <button class="settings-button" id="penButton">Pen</button>
+                    <button class="settings-button" id="eraserButton">Eraser</button>
+                </div>
+                <button class="settings-button" id="colorfulModeButton">Colorful Mode</button>
+                <button class="settings-button" id="shadingModeButton">Shading Mode</button>
+                <button class="settings-button" id="lightenModeButton">Lighten Mode</button>
+                <div class="undo-redo-container">
+                    <button class="settings-button" id="undoButton">Undo</button>
+                    <button class="settings-button" id="redoButton">Redo</button>
                 </div>
             </div>
-            <!-- Grid -->
-            <div class="grid-container">
-                <div id="grid"></div>
+            <!-- Grid Settings -->
+            <div class="grid-settings">
+                <h2 class="settings-title">Grid Settings</h2>
+                <p>Grid size: <span id="gridSize"></span></p>
+                <input type="range" min="1" max="64" value="32" id="gridSizeSlider">
+                <button class="settings-button" id="gridLinesButton">Grid Lines: <span
+                        id="gridLinesStatus"></span></button>
+                <button class="settings-button" id="screenshotButton">Screenshot</button>
+                <button class="settings-button" id="clearButton">Clear</button>
             </div>
         </div>
-        <!-- Footer -->
-        <div class="footer">
-            <p>Copyright &copy; <span id="currentYear"></span> by Ali Ashraf</p>
+        <!-- Grid -->
+        <div class="grid-container">
+            <div id="grid"></div>
         </div>
-    </body>
+    </div>
+    <!-- Footer -->
+    <div class="footer">
+        <p>Copyright &copy; <span id="currentYear"></span> by Ali Ashraf</p>
+    </div>
+</body>
+
 </html>

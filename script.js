@@ -39,7 +39,7 @@ function constructGrid() {
         pixels[i].style.backgroundColor = backgroundColorPicker.value;
         grid.appendChild(pixels[i]);
     }
-    
+
     if (gridLinesStatus === "ON") {
         addGridLines();
     }
@@ -104,7 +104,7 @@ function removeGridLines() {
             if (column == gridSize) {
                 pixels[index].style.removeProperty("border-right");
             }
-            
+
             if (row == gridSize) {
                 pixels[index].style.removeProperty("border-bottom");
             }
@@ -134,40 +134,40 @@ function toggleGridLines() {
 
 function draw(pixel) {
     redoArray.length = 0;
-    
-   switch (drawingMode) {
-    case "pen":
-        if (pixel.style.backgroundColor === penColorPicker.rgbValue && usedPixels.includes(pixel)) return;
-        undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
-        pixel.style.backgroundColor = penColorPicker.value;
-        usedPixels.add(pixel);
-        break;
 
-    case "eraser":
-        if (!usedPixels.includes(pixel)) return;
-        undoArray.push(new Pixel(pixel, "erased"));
-        pixel.style.backgroundColor = backgroundColorPicker.value;
-        usedPixels.remove(pixel);
-        break;
+    switch (drawingMode) {
+        case "pen":
+            if (pixel.style.backgroundColor === penColorPicker.rgbValue && usedPixels.includes(pixel)) return;
+            undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
+            pixel.style.backgroundColor = penColorPicker.value;
+            usedPixels.add(pixel);
+            break;
 
-    case "colorful":
-        undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
-        pixel.style.backgroundColor = getRandomColor();
-        usedPixels.add(pixel);
-        break;
+        case "eraser":
+            if (!usedPixels.includes(pixel)) return;
+            undoArray.push(new Pixel(pixel, "erased"));
+            pixel.style.backgroundColor = backgroundColorPicker.value;
+            usedPixels.remove(pixel);
+            break;
 
-    case "shading":
-        undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
-        pixel.style.backgroundColor = shadeOrLightenColor(pixel.style.backgroundColor, "shade");
-        usedPixels.add(pixel);
-        break;
+        case "colorful":
+            undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
+            pixel.style.backgroundColor = getRandomColor();
+            usedPixels.add(pixel);
+            break;
 
-    case "lighten":
-        undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
-        pixel.style.backgroundColor = shadeOrLightenColor(pixel.style.backgroundColor, "lighten");
-        usedPixels.add(pixel);
-        break;
-   }
+        case "shading":
+            undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
+            pixel.style.backgroundColor = shadeOrLightenColor(pixel.style.backgroundColor, "shade");
+            usedPixels.add(pixel);
+            break;
+
+        case "lighten":
+            undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
+            pixel.style.backgroundColor = shadeOrLightenColor(pixel.style.backgroundColor, "lighten");
+            usedPixels.add(pixel);
+            break;
+    }
 }
 
 function getRandomColor() {
@@ -256,18 +256,18 @@ function hex2rgb(hex) {
 function Pixel(pixel, status) {
     this.pixel = pixel;
     this.color = pixel.style.backgroundColor;
-    this.status = status ;
+    this.status = status;
 }
 
-usedPixels.add = function(pixel) {
+usedPixels.add = function (pixel) {
     if (this.includes(pixel)) return;
     this.push(pixel);
 }
 
-usedPixels.remove = function(pixel) {
+usedPixels.remove = function (pixel) {
     if (!this.includes(pixel)) return;
     const index = usedPixels.indexOf(pixel);
-    usedPixels.splice(index,1);
+    usedPixels.splice(index, 1);
 }
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -350,15 +350,15 @@ screenshotButton.addEventListener("transitionend", () => {
 
 document.addEventListener("keydown", event => {
     if ((event.ctrlKey || event.metaKey) && event.code === "KeyZ") {
-      event.preventDefault();
-      undoButton.click();
+        event.preventDefault();
+        undoButton.click();
     }
 });
 
 document.addEventListener("keydown", event => {
     if ((event.ctrlKey || event.metaKey) && event.code === "KeyY") {
-      event.preventDefault();
-      redoButton.click();
+        event.preventDefault();
+        redoButton.click();
     }
 });
 

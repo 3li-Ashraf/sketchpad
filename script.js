@@ -422,10 +422,6 @@ function FloodFillBlank(pixelsMatrix, row, column, filledPixels) {
     FloodFillBlank(pixelsMatrix, row - 1, column, filledPixels);
     FloodFillBlank(pixelsMatrix, row, column + 1, filledPixels);
     FloodFillBlank(pixelsMatrix, row, column - 1, filledPixels);
-    FloodFillBlank(pixelsMatrix, row + 1, column + 1, filledPixels);
-    FloodFillBlank(pixelsMatrix, row - 1, column + 1, filledPixels);
-    FloodFillBlank(pixelsMatrix, row + 1, column - 1, filledPixels);
-    FloodFillBlank(pixelsMatrix, row - 1, column - 1, filledPixels);
 }
 
 function validCoordinates(pixelsMatrix, row, column) {

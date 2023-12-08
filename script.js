@@ -235,7 +235,7 @@ function undo() {
         case "fillBlank":
             action.pixel.forEach(pixel => {
                 pixel.isFilled = 0;
-                action.pixel.colorHistoryArrayIndex--;
+                pixel.colorHistoryArrayIndex--;
                 pixel.div.style.backgroundColor = backgroundColorPicker.value;
             });
             break;
@@ -276,8 +276,7 @@ function redo() {
         case "fillBlank":
             action.pixel.forEach(pixel => {
                 pixel.isFilled = 1;
-                action.pixel.colorHistoryArrayIndex++;
-                pixel.div.style.backgroundColor = pixel.colorHistoryArray[0];
+                pixel.div.style.backgroundColor = pixel.colorHistoryArray[++pixel.colorHistoryArrayIndex];
             });
             break;
 

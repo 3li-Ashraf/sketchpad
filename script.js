@@ -213,10 +213,16 @@ function undo() {
     redoActionArray.push(action);
 
     switch (action.type) {
+        case "erase":
+            action.pixel.isFilled = 1;
+            action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[action.pixel.colorHistoryArrayIndex];
+            break;
+
         case "drawBlank":
         case "shadeBlank":
         case "lightenBlank":
             action.pixel.isFilled = 0;
+            action.pixel.colorHistoryArrayIndex--;
             action.pixel.div.style.backgroundColor = backgroundColorPicker.value;
             break;
 
@@ -226,20 +232,17 @@ function undo() {
             action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[--action.pixel.colorHistoryArrayIndex];
             break;
 
-        case "erase":
-            action.pixel.isFilled = 1;
-            action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[action.pixel.colorHistoryArrayIndex];
+        case "fillBlank":
+            action.pixel.forEach(pixel => {
+                pixel.isFilled = 0;
+                action.pixel.colorHistoryArrayIndex--;
+                pixel.div.style.backgroundColor = backgroundColorPicker.value;
+            });
+            break;
 
         case "fillFilled":
             action.pixel.forEach(pixel => {
                 pixel.div.style.backgroundColor = pixel.colorHistoryArray[--pixel.colorHistoryArrayIndex];
-            });
-            break;
-
-        case "fillBlank":
-            action.pixel.forEach(pixel => {
-                pixel.isFilled = 0;
-                pixel.div.style.backgroundColor = backgroundColorPicker.value;
             });
             break;
     }
@@ -257,29 +260,30 @@ function redo() {
             action.pixel.div.style.backgroundColor = backgroundColorPicker.value;
             break;
 
+        case "drawBlank":
+        case "shadeBlank":
+        case "lightenBlank":
+            action.pixel.isFilled = 1;
+            action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[++action.pixel.colorHistoryArrayIndex];
+            break;
+
         case "drawFilled":
         case "shadeFilled":
         case "lightenFilled":
             action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[++action.pixel.colorHistoryArrayIndex];
             break;
 
-        case "drawBlank":
-        case "shadeBlank":
-        case "lightenBlank":
-            action.pixel.isFilled = 1;
-            action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[0];
+        case "fillBlank":
+            action.pixel.forEach(pixel => {
+                pixel.isFilled = 1;
+                action.pixel.colorHistoryArrayIndex++;
+                pixel.div.style.backgroundColor = pixel.colorHistoryArray[0];
+            });
             break;
 
         case "fillFilled":
             action.pixel.forEach(pixel => {
                 pixel.div.style.backgroundColor = pixel.colorHistoryArray[++pixel.colorHistoryArrayIndex];
-            });
-            break;
-
-        case "fillBlank":
-            action.pixel.forEach(pixel => {
-                pixel.isFilled = 1;
-                pixel.div.style.backgroundColor = pixel.colorHistoryArray[0];
             });
             break;
     }

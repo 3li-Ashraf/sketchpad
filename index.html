@@ -39,21 +39,24 @@
             <!-- Drawing Settings -->
             <div class="drawing-settings">
                 <h2 class="settings-title">Drawing Settings</h2>
-                <div class="pen-color-container">
-                    <input type="color" id="penColorPicker">
-                    <span>Pen Color</span>
+                <div class="pen-and-fill-color-container">
+                    <input type="color" id="penAndFillColorPicker">
+                    <span>Pen/Fill Color</span>
                 </div>
                 <div class="background-color-container">
                     <input type="color" value="#ffffff" id="backgroundColorPicker">
                     <span>Background Color</span>
                 </div>
-                <div class="pen-eraser-container">
+                <div class="pen-fill-eraser-container">
                     <button class="settings-button" id="penButton">Pen</button>
                     <button class="settings-button" id="eraserButton">Eraser</button>
+                    <button class="settings-button" id="fillButton">Fill</button>
                 </div>
-                <button class="settings-button" id="colorfulModeButton">Colorful Mode</button>
-                <button class="settings-button" id="shadingModeButton">Shading Mode</button>
-                <button class="settings-button" id="lightenModeButton">Lighten Mode</button>
+                <div class="shade-lighten-colorful-container">
+                    <button class="settings-button" id="shadingModeButton">Shade</button>
+                    <button class="settings-button" id="lightenModeButton">Lighten</button>
+                    <button class="settings-button" id="colorfulModeButton">Colorful</button>
+                </div>
                 <div class="undo-redo-container">
                     <button class="settings-button" id="undoButton">Undo</button>
                     <button class="settings-button" id="redoButton">Redo</button>
@@ -70,9 +73,13 @@
                 <button class="settings-button" id="clearButton">Clear</button>
             </div>
         </div>
-        <!-- Grid -->
-        <div class="grid-container">
-            <div id="grid"></div>
+        <!-- Main Center -->
+        <div class="main-center">
+            <div class="grid-container">
+                <div id="grid"></div>
+            </div>
+        </div>
+        <div class="empty-div">
         </div>
     </div>
     <!-- Footer -->

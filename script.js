@@ -1,10 +1,11 @@
 //---------------------------------------------------------------------------------------------------------------------
 // Declarations
 
-const penColorPicker = document.querySelector("#penColorPicker");
+const penColorPicker = document.querySelector("#penAndFillColorPicker");
 const backgroundColorPicker = document.querySelector("#backgroundColorPicker");
 const penButton = document.querySelector("#penButton");
 const eraserButton = document.querySelector("#eraserButton");
+const fillButton = document.querySelector("#fillButton");
 const colorfulModeButton = document.querySelector("#colorfulModeButton");
 const shadingModeButton = document.querySelector("#shadingModeButton");
 const lightenModeButton = document.querySelector("#lightenModeButton");
@@ -18,10 +19,9 @@ const screenshotButton = document.querySelector("#screenshotButton");
 const clearButton = document.querySelector("#clearButton");
 const grid = document.querySelector("#grid");
 
-const pixels = [];
-const usedPixels = [];
-const undoArray = [];
-const redoArray = [];
+let pixelsMatrix;
+const undoActionArray = [];
+const redoActionArray = [];
 let gridLinesStatus = "ON";
 let drawingMode = "pen";
 let drawingModeButton = penButton;
@@ -31,34 +31,38 @@ let drawingModeButton = penButton;
 
 function constructGrid() {
     const gridSize = gridSizeSlider.value;
-    grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`
-    grid.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`
+    grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+    grid.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
+    pixelsMatrix = generateMatrix(gridSize, gridSize);
 
-    for (let i = 0; i < gridSize * gridSize; i++) {
-        pixels[i] = document.createElement("div");
-        pixels[i].style.backgroundColor = backgroundColorPicker.value;
-        grid.appendChild(pixels[i]);
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            const div = document.createElement("div");
+            div.style.backgroundColor = backgroundColorPicker.value;
+            grid.appendChild(div);
+            pixelsMatrix[i][j] = new Pixel(div, 0);
+            pixelsMatrix[i][j].div.addEventListener("mousedown", event => draw(event.target));
+            pixelsMatrix[i][j].div.addEventListener("mouseenter", (event) => {
+                if (event.buttons === 0) return;
+                draw(event.target);
+            });
+        }
     }
 
     if (gridLinesStatus === "ON") {
         addGridLines();
     }
-
-    pixels.forEach(pixel => {
-        pixel.addEventListener("mousedown", event => draw(event.target));
-        pixel.addEventListener("mouseenter", event => {
-            if (event.buttons === 0) return;
-            draw(event.target);
-        });
-    });
 }
 
 function destructGrid() {
-    pixels.forEach(pixel => grid.removeChild(pixel));
-    pixels.length = 0;
-    usedPixels.length = 0;
-    undoArray.length = 0;
-    redoArray.length = 0;
+    for (let i = 0; i < pixelsMatrix.rows; i++) {
+        for (let j = 0; j < pixelsMatrix.columns; j++) {
+            grid.removeChild(pixelsMatrix[i][j].div);
+        }
+    }
+    pixelsMatrix = null;
+    undoActionArray.length = 0;
+    redoActionArray.length = 0;
 }
 
 function clearGrid() {
@@ -67,49 +71,38 @@ function clearGrid() {
 }
 
 function addGridLines() {
-    const gridSize = gridSizeSlider.value;
-    let index = 0;
-
-    for (let row = 1; row <= gridSize; row++) {
-        for (let column = 1; column <= gridSize; column++) {
-
+    for (let i = 0; i < pixelsMatrix.rows; i++) {
+        for (let j = 0; j < pixelsMatrix.columns; j++) {
             // To avoid double borders, top and left borders are applied to every pixel
-            pixels[index].style.borderTop = "1px solid #9c9c9c";
-            pixels[index].style.borderLeft = "1px solid #9c9c9c";
+            pixelsMatrix[i][j].div.style.borderTop = "1px solid #9c9c9c";
+            pixelsMatrix[i][j].div.style.borderLeft = "1px solid #9c9c9c";
 
             // Add a right border the the right most pixels
-            if (column == gridSize) {
-                pixels[index].style.borderRight = "1px solid #9c9c9c";
+            if (j + 1 == pixelsMatrix.rows) {
+                pixelsMatrix[i][j].div.style.borderRight = "1px solid #9c9c9c";
             }
 
             // Add a bottom border to the bottom most pixels
-            if (row == gridSize) {
-                pixels[index].style.borderBottom = "1px solid #9c9c9c";
+            if (i + 1 == pixelsMatrix.rows) {
+                pixelsMatrix[i][j].div.style.borderBottom = "1px solid #9c9c9c";
             }
-
-            index++;
         }
     }
 }
 
 function removeGridLines() {
-    const gridSize = gridSizeSlider.value;
-    let index = 0;
+    for (let i = 0; i < pixelsMatrix.rows; i++) {
+        for (let j = 0; j < pixelsMatrix.columns; j++) {
+            pixelsMatrix[i][j].div.style.removeProperty("border-top");
+            pixelsMatrix[i][j].div.style.removeProperty("border-left");
 
-    for (let row = 1; row <= gridSize; row++) {
-        for (let column = 1; column <= gridSize; column++) {
-            pixels[index].style.removeProperty("border-top");
-            pixels[index].style.removeProperty("border-left");
-
-            if (column == gridSize) {
-                pixels[index].style.removeProperty("border-right");
+            if (j + 1 == pixelsMatrix.rows) {
+                pixelsMatrix[i][j].div.style.removeProperty("border-right");
             }
 
-            if (row == gridSize) {
-                pixels[index].style.removeProperty("border-bottom");
+            if (i + 1 == pixelsMatrix.rows) {
+                pixelsMatrix[i][j].div.style.removeProperty("border-bottom");
             }
-
-            index++;
         }
     }
 }
@@ -132,42 +125,66 @@ function toggleGridLines() {
     }
 }
 
-function draw(pixel) {
-    redoArray.length = 0;
+function draw(div) {
+    const pixel = getPixel(div);
+    const penColor = penColorPicker.rgbValue;
+    const backgroundColor = backgroundColorPicker.value;
 
     switch (drawingMode) {
         case "pen":
-            if (pixel.style.backgroundColor === penColorPicker.rgbValue && usedPixels.includes(pixel)) return;
-            undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
-            pixel.style.backgroundColor = penColorPicker.value;
-            usedPixels.add(pixel);
+            if (pixel.isFilled && div.style.backgroundColor === penColor) return;
+            undoActionArray.push(new Action(pixel, pixel.isFilled ? "drawFilled" : "drawBlank"));
+            div.style.backgroundColor = penColor;
+            pixel.updateColorHistoryArray();
+            pixel.isFilled = 1;
             break;
 
         case "eraser":
-            if (!usedPixels.includes(pixel)) return;
-            undoArray.push(new Pixel(pixel, "erased"));
-            pixel.style.backgroundColor = backgroundColorPicker.value;
-            usedPixels.remove(pixel);
+            if (!pixel.isFilled) return;
+            undoActionArray.push(new Action(pixel, "erase"));
+            div.style.backgroundColor = backgroundColor;
+            pixel.isFilled = 0;
             break;
 
-        case "colorful":
-            undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
-            pixel.style.backgroundColor = getRandomColor();
-            usedPixels.add(pixel);
+        case "fill":
+            const filledPixels = [];
+
+            if (pixel.isFilled) {
+                undoActionArray.push(new Action(filledPixels, "fillFilled"));
+                FloodFillFilled(pixelsMatrix, getPixelRow(div), getPixelColumn(div), div.style.backgroundColor, filledPixels);
+            }
+            else {
+                undoActionArray.push(new Action(filledPixels, "fillBlank"));
+                FloodFillBlank(pixelsMatrix, getPixelRow(div), getPixelColumn(div), filledPixels);
+            }
+
+            if (filledPixels.length === 0) undoActionArray.pop();
             break;
 
         case "shading":
-            undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
-            pixel.style.backgroundColor = shadeOrLightenColor(pixel.style.backgroundColor, "shade");
-            usedPixels.add(pixel);
+            undoActionArray.push(new Action(pixel, pixel.isFilled ? "shadeFilled" : "shadeBlank"));
+            div.style.backgroundColor = shadeOrLightenColor(div.style.backgroundColor, "shade");
+            pixel.updateColorHistoryArray();
+            pixel.isFilled = 1;
             break;
 
         case "lighten":
-            undoArray.push(new Pixel(pixel, !usedPixels.includes(pixel) ? "blank" : "used"));
-            pixel.style.backgroundColor = shadeOrLightenColor(pixel.style.backgroundColor, "lighten");
-            usedPixels.add(pixel);
+            undoActionArray.push(new Action(pixel, pixel.isFilled ? "lightenFilled" : "lightenBlank"));
+            div.style.backgroundColor = shadeOrLightenColor(div.style.backgroundColor, "lighten");
+            pixel.updateColorHistoryArray();
+            pixel.isFilled = 1;
+            break;
+
+        case "colorful":
+            undoActionArray.push(new Action(pixel, pixel.isFilled ? "drawFilled" : "drawBlank"));
+            div.style.backgroundColor = getRandomColor();
+            pixel.updateColorHistoryArray();
+            pixel.isFilled = 1;
             break;
     }
+
+    redoActionArray.length = 0;
+    clearPixelsColorRedoHistory();
 }
 
 function getRandomColor() {
@@ -190,41 +207,80 @@ function shadeOrLightenColor(color, option) {
 }
 
 function undo() {
-    if (undoArray.length === 0) return;
+    if (undoActionArray.length === 0) return;
 
-    const object = undoArray.pop();
-    redoArray.push(new Pixel(object.pixel, object.status));
+    const action = undoActionArray.pop();
+    redoActionArray.push(action);
 
-    switch (object.status) {
-        case "blank":
-            usedPixels.remove(object.pixel);
-            object.pixel.style.backgroundColor = backgroundColorPicker.value;
+    switch (action.type) {
+        case "drawBlank":
+        case "shadeBlank":
+        case "lightenBlank":
+            action.pixel.isFilled = 0;
+            action.pixel.div.style.backgroundColor = backgroundColorPicker.value;
             break;
 
-        case "used":
-        case "erased":
-            usedPixels.add(object.pixel);
-            object.pixel.style.backgroundColor = object.color;
+        case "drawFilled":
+        case "shadeFilled":
+        case "lightenFilled":
+            action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[--action.pixel.colorHistoryArrayIndex];
+            break;
+
+        case "erase":
+            action.pixel.isFilled = 1;
+            action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[action.pixel.colorHistoryArrayIndex];
+
+        case "fillFilled":
+            action.pixel.forEach(pixel => {
+                pixel.div.style.backgroundColor = pixel.colorHistoryArray[--pixel.colorHistoryArrayIndex];
+            });
+            break;
+
+        case "fillBlank":
+            action.pixel.forEach(pixel => {
+                pixel.isFilled = 0;
+                pixel.div.style.backgroundColor = backgroundColorPicker.value;
+            });
             break;
     }
 }
 
 function redo() {
-    if (redoArray.length === 0) return;
+    if (redoActionArray.length === 0) return;
 
-    const object = redoArray.pop();
-    undoArray.push(new Pixel(object.pixel, object.status));
+    const action = redoActionArray.pop();
+    undoActionArray.push(action);
 
-    switch (object.status) {
-        case "used":
-        case "blank":
-            usedPixels.add(object.pixel);
-            object.pixel.style.backgroundColor = object.color;
+    switch (action.type) {
+        case "erase":
+            action.pixel.isFilled = 0;
+            action.pixel.div.style.backgroundColor = backgroundColorPicker.value;
             break;
 
-        case "erased":
-            usedPixels.remove(object.pixel);
-            object.pixel.style.backgroundColor = backgroundColorPicker.value;
+        case "drawFilled":
+        case "shadeFilled":
+        case "lightenFilled":
+            action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[++action.pixel.colorHistoryArrayIndex];
+            break;
+
+        case "drawBlank":
+        case "shadeBlank":
+        case "lightenBlank":
+            action.pixel.isFilled = 1;
+            action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[0];
+            break;
+
+        case "fillFilled":
+            action.pixel.forEach(pixel => {
+                pixel.div.style.backgroundColor = pixel.colorHistoryArray[++pixel.colorHistoryArrayIndex];
+            });
+            break;
+
+        case "fillBlank":
+            action.pixel.forEach(pixel => {
+                pixel.isFilled = 1;
+                pixel.div.style.backgroundColor = pixel.colorHistoryArray[0];
+            });
             break;
     }
 }
@@ -253,21 +309,127 @@ function hex2rgb(hex) {
     return `rgb(${R}, ${G}, ${B})`;
 }
 
-function Pixel(pixel, status) {
+getPixel = function (div) {
+    for (let i = 0; i < pixelsMatrix.rows; i++) {
+        for (let j = 0; j < pixelsMatrix.columns; j++) {
+            if (pixelsMatrix[i][j].div === div) {
+                return pixelsMatrix[i][j];
+            }
+        }
+    }
+}
+
+getPixelRow = function (div) {
+    for (let i = 0; i < pixelsMatrix.rows; i++) {
+        for (let j = 0; j < pixelsMatrix.columns; j++) {
+            if (pixelsMatrix[i][j].div === div) {
+                return i;
+            }
+        }
+    }
+}
+
+getPixelColumn = function (div) {
+    for (let i = 0; i < pixelsMatrix.rows; i++) {
+        for (let j = 0; j < pixelsMatrix.columns; j++) {
+            if (pixelsMatrix[i][j].div === div) {
+                return j;
+            }
+        }
+    }
+}
+
+function generateMatrix(row, col) {
+    let matrix = [];
+
+    for (let i = 0; i < row; i++) {
+        matrix[i] = [];
+
+        for (let j = 0; j < col; j++) {
+            matrix[i][j] = 0;
+        }
+    }
+
+    matrix.rows = row;
+    matrix.columns = col;
+
+    return matrix;
+}
+
+function clearPixelsColorRedoHistory() {
+    for (let i = 0; i < pixelsMatrix.rows; i++) {
+        for (let j = 0; j < pixelsMatrix.columns; j++) {
+            pixelsMatrix[i][j].calibrateColorHistoryArray();
+        }
+    }
+}
+
+function Pixel(div, isFilled) {
+    this.div = div;
+    this.isFilled = isFilled;
+    this.colorHistoryArray = [];
+    this.colorHistoryArrayIndex = -1;
+
+    this.updateColorHistoryArray = function () {
+        this.colorHistoryArray[++this.colorHistoryArrayIndex] = div.style.backgroundColor;
+    };
+
+    this.calibrateColorHistoryArray = function () {
+        this.colorHistoryArray.length = this.colorHistoryArrayIndex + 1;
+    }
+}
+
+function Action(pixel, type = null) {
     this.pixel = pixel;
-    this.color = pixel.style.backgroundColor;
-    this.status = status;
+    this.type = type;
 }
 
-usedPixels.add = function (pixel) {
-    if (this.includes(pixel)) return;
-    this.push(pixel);
+function FloodFillFilled(pixelsMatrix, row, column, filledColor, filledPixels) {
+    if (!validCoordinates(pixelsMatrix, row, column))
+        return;
+
+    if ((pixelsMatrix[row][column].isFilled === 1
+        && pixelsMatrix[row][column].div.style.backgroundColor !== penColorPicker.rgbValue
+        && pixelsMatrix[row][column].div.style.backgroundColor === filledColor)) {
+
+        pixelsMatrix[row][column].div.style.backgroundColor = penColorPicker.rgbValue;
+        pixelsMatrix[row][column].updateColorHistoryArray();
+        filledPixels.push(pixelsMatrix[row][column]);
+
+        FloodFillFilled(pixelsMatrix, row + 1, column, filledColor, filledPixels);
+        FloodFillFilled(pixelsMatrix, row - 1, column, filledColor, filledPixels);
+        FloodFillFilled(pixelsMatrix, row, column + 1, filledColor, filledPixels);
+        FloodFillFilled(pixelsMatrix, row, column - 1, filledColor, filledPixels);
+        FloodFillFilled(pixelsMatrix, row + 1, column + 1, filledColor, filledPixels);
+        FloodFillFilled(pixelsMatrix, row - 1, column + 1, filledColor, filledPixels);
+        FloodFillFilled(pixelsMatrix, row + 1, column - 1, filledColor, filledPixels);
+        FloodFillFilled(pixelsMatrix, row - 1, column - 1, filledColor, filledPixels);
+    }
 }
 
-usedPixels.remove = function (pixel) {
-    if (!this.includes(pixel)) return;
-    const index = usedPixels.indexOf(pixel);
-    usedPixels.splice(index, 1);
+function FloodFillBlank(pixelsMatrix, row, column, filledPixels) {
+    if (!validCoordinates(pixelsMatrix, row, column))
+        return;
+
+    if (pixelsMatrix[row][column].isFilled === 1) return;
+
+    pixelsMatrix[row][column].isFilled = 1;
+    pixelsMatrix[row][column].div.style.backgroundColor = penColorPicker.rgbValue;
+    pixelsMatrix[row][column].updateColorHistoryArray();
+    filledPixels.push(pixelsMatrix[row][column]);
+
+    FloodFillBlank(pixelsMatrix, row + 1, column, filledPixels);
+    FloodFillBlank(pixelsMatrix, row - 1, column, filledPixels);
+    FloodFillBlank(pixelsMatrix, row, column + 1, filledPixels);
+    FloodFillBlank(pixelsMatrix, row, column - 1, filledPixels);
+    FloodFillBlank(pixelsMatrix, row + 1, column + 1, filledPixels);
+    FloodFillBlank(pixelsMatrix, row - 1, column + 1, filledPixels);
+    FloodFillBlank(pixelsMatrix, row + 1, column - 1, filledPixels);
+    FloodFillBlank(pixelsMatrix, row - 1, column - 1, filledPixels);
+}
+
+function validCoordinates(pixelsMatrix, row, column) {
+    return (row >= 0 && row < pixelsMatrix.rows && column >= 0 && column < pixelsMatrix.columns);
 }
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -278,11 +440,12 @@ penColorPicker.addEventListener("input", () => {
 });
 
 backgroundColorPicker.addEventListener("input", () => {
-    const blankPixels = pixels.filter(pixel => !usedPixels.includes(pixel));
-
-    blankPixels.forEach(pixel => {
-        pixel.style.backgroundColor = backgroundColorPicker.value;
-    });
+    for (let i = 0; i < pixelsMatrix.rows; i++) {
+        for (let j = 0; j < pixelsMatrix.columns; j++) {
+            if (pixelsMatrix[i][j].isFilled) continue;
+            pixelsMatrix[i][j].div.style.backgroundColor = backgroundColorPicker.value;
+        }
+    }
 });
 
 penButton.addEventListener("click", () => {
@@ -291,6 +454,10 @@ penButton.addEventListener("click", () => {
 
 eraserButton.addEventListener("click", () => {
     changeDrawingMode("eraser", eraserButton);
+});
+
+fillButton.addEventListener("click", () => {
+    changeDrawingMode("fill", fillButton);
 });
 
 colorfulModeButton.addEventListener("click", () => {

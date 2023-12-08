@@ -30,14 +30,13 @@ body {
 
 .main {
     display: flex;
-    justify-content: center;
     align-items: center;
-    gap: 150px;
+    padding: 0px 50px;
     flex: auto;
 }
 
 .settings {
-    width: 302px;
+    width: 322px;
     height: 702px;
     color: #3ea6ff;
     background-color: #202020;
@@ -49,20 +48,33 @@ body {
     justify-content: space-between;
 }
 
+.main-center {
+    flex: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.empty-div {
+    width: 322px;
+    height: 702px;
+}
+
 .drawing-settings,
 .grid-settings {
     display: flex;
     flex-direction: column;
-    gap: 13px;
+    gap: 20px;
 }
 
 .settings-title {
     margin: 5px 0;
-    font-size: 15px;
+    text-align: center;
+    font-size: 16px;
     font-family: 'Press Start 2P', cursive;
 }
 
-.pen-color-container,
+.pen-and-fill-color-container,
 .background-color-container {
     display: flex;
     align-items: center;
@@ -90,13 +102,15 @@ input[type="color"]::-moz-color-swatch {
     border-radius: 4px;
 }
 
-.pen-eraser-container,
+.pen-fill-eraser-container,
+.shade-lighten-colorful-container,
 .undo-redo-container {
     display: flex;
     gap: 10px;
 }
 
-.pen-eraser-container button,
+.pen-fill-eraser-container button,
+.shade-lighten-colorful-container button,
 .undo-redo-container button {
     flex: 1;
 }

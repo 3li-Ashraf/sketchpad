@@ -400,10 +400,6 @@ function FloodFillFilled(pixelsMatrix, row, column, filledColor, filledPixels) {
         FloodFillFilled(pixelsMatrix, row - 1, column, filledColor, filledPixels);
         FloodFillFilled(pixelsMatrix, row, column + 1, filledColor, filledPixels);
         FloodFillFilled(pixelsMatrix, row, column - 1, filledColor, filledPixels);
-        FloodFillFilled(pixelsMatrix, row + 1, column + 1, filledColor, filledPixels);
-        FloodFillFilled(pixelsMatrix, row - 1, column + 1, filledColor, filledPixels);
-        FloodFillFilled(pixelsMatrix, row + 1, column - 1, filledColor, filledPixels);
-        FloodFillFilled(pixelsMatrix, row - 1, column - 1, filledColor, filledPixels);
     }
 }
 

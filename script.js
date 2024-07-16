@@ -1,5 +1,6 @@
-//---------------------------------------------------------------------------------------------------------------------
-// Declarations
+/*********************************************************************************************************************/
+// Declarations                                                                                                       /
+/*********************************************************************************************************************/
 
 const penColorPicker = document.querySelector("#penAndFillColorPicker");
 const backgroundColorPicker = document.querySelector("#backgroundColorPicker");
@@ -16,6 +17,9 @@ const undoButton = document.querySelector("#undoButton");
 const redoButton = document.querySelector("#redoButton");
 const gridLinesStatusOutput = document.querySelector("#gridLinesStatus");
 const screenshotButton = document.querySelector("#screenshotButton");
+const saveButton = document.querySelector("#saveButton");
+const loadButton = document.querySelector("#loadButton");
+const loadInput = document.querySelector("#loadInput");
 const clearButton = document.querySelector("#clearButton");
 const grid = document.querySelector("#grid");
 
@@ -26,40 +30,44 @@ let gridLinesStatus = "ON";
 let drawingMode = "pen";
 let drawingModeButton = penButton;
 
-//---------------------------------------------------------------------------------------------------------------------
-// Functions
+/*********************************************************************************************************************/
+// Functions                                                                                                          /
+/*********************************************************************************************************************/
 
 function constructGrid() {
     const gridSize = gridSizeSlider.value;
+    pixelsMatrix = generateMatrix(gridSize);
+
     grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
     grid.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
-    pixelsMatrix = generateMatrix(gridSize, gridSize);
 
     for (let i = 0; i < gridSize; i++) {
         for (let j = 0; j < gridSize; j++) {
             const div = document.createElement("div");
             div.style.backgroundColor = backgroundColorPicker.value;
+            div.dataset.position = `${i},${j}`;
             grid.appendChild(div);
-            pixelsMatrix[i][j] = new Pixel(div, 0);
+            pixelsMatrix[i][j] = new Pixel(div, false);
             pixelsMatrix[i][j].div.addEventListener("mousedown", event => draw(event.target));
-            pixelsMatrix[i][j].div.addEventListener("mouseenter", (event) => {
+            pixelsMatrix[i][j].div.addEventListener("mouseenter", event => {
                 if (event.buttons === 0) return;
                 draw(event.target);
             });
         }
     }
 
-    if (gridLinesStatus === "ON") {
-        addGridLines();
-    }
+    if (gridLinesStatus === "ON") addGridLines();
 }
 
 function destructGrid() {
-    for (let i = 0; i < pixelsMatrix.rows; i++) {
-        for (let j = 0; j < pixelsMatrix.columns; j++) {
+    const gridSize = pixelsMatrix.length;
+
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
             grid.removeChild(pixelsMatrix[i][j].div);
         }
     }
+
     pixelsMatrix = null;
     undoActionArray.length = 0;
     redoActionArray.length = 0;
@@ -71,19 +79,22 @@ function clearGrid() {
 }
 
 function addGridLines() {
-    for (let i = 0; i < pixelsMatrix.rows; i++) {
-        for (let j = 0; j < pixelsMatrix.columns; j++) {
+    const gridSize = gridSizeSlider.value;
+
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+
             // To avoid double borders, top and left borders are applied to every pixel
             pixelsMatrix[i][j].div.style.borderTop = "1px solid #9c9c9c";
             pixelsMatrix[i][j].div.style.borderLeft = "1px solid #9c9c9c";
 
             // Add a right border the the right most pixels
-            if (j + 1 == pixelsMatrix.rows) {
+            if (j == gridSize - 1) {
                 pixelsMatrix[i][j].div.style.borderRight = "1px solid #9c9c9c";
             }
 
             // Add a bottom border to the bottom most pixels
-            if (i + 1 == pixelsMatrix.rows) {
+            if (i == gridSize - 1) {
                 pixelsMatrix[i][j].div.style.borderBottom = "1px solid #9c9c9c";
             }
         }
@@ -91,16 +102,18 @@ function addGridLines() {
 }
 
 function removeGridLines() {
-    for (let i = 0; i < pixelsMatrix.rows; i++) {
-        for (let j = 0; j < pixelsMatrix.columns; j++) {
+    const gridSize = gridSizeSlider.value;
+
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
             pixelsMatrix[i][j].div.style.removeProperty("border-top");
             pixelsMatrix[i][j].div.style.removeProperty("border-left");
 
-            if (j + 1 == pixelsMatrix.rows) {
+            if (j == gridSize - 1) {
                 pixelsMatrix[i][j].div.style.removeProperty("border-right");
             }
 
-            if (i + 1 == pixelsMatrix.rows) {
+            if (i == gridSize - 1) {
                 pixelsMatrix[i][j].div.style.removeProperty("border-bottom");
             }
         }
@@ -136,14 +149,14 @@ function draw(div) {
             undoActionArray.push(new Action(pixel, pixel.isFilled ? "drawFilled" : "drawBlank"));
             div.style.backgroundColor = penColor;
             pixel.updateColorHistoryArray();
-            pixel.isFilled = 1;
+            pixel.isFilled = true;
             break;
 
         case "eraser":
             if (!pixel.isFilled) return;
             undoActionArray.push(new Action(pixel, "erase"));
             div.style.backgroundColor = backgroundColor;
-            pixel.isFilled = 0;
+            pixel.isFilled = false;
             break;
 
         case "fill":
@@ -165,26 +178,33 @@ function draw(div) {
             undoActionArray.push(new Action(pixel, pixel.isFilled ? "shadeFilled" : "shadeBlank"));
             div.style.backgroundColor = shadeOrLightenColor(div.style.backgroundColor, "shade");
             pixel.updateColorHistoryArray();
-            pixel.isFilled = 1;
+            pixel.isFilled = true;
             break;
 
         case "lighten":
             undoActionArray.push(new Action(pixel, pixel.isFilled ? "lightenFilled" : "lightenBlank"));
             div.style.backgroundColor = shadeOrLightenColor(div.style.backgroundColor, "lighten");
             pixel.updateColorHistoryArray();
-            pixel.isFilled = 1;
+            pixel.isFilled = true;
             break;
 
         case "colorful":
             undoActionArray.push(new Action(pixel, pixel.isFilled ? "drawFilled" : "drawBlank"));
             div.style.backgroundColor = getRandomColor();
             pixel.updateColorHistoryArray();
-            pixel.isFilled = 1;
+            pixel.isFilled = true;
             break;
     }
 
     redoActionArray.length = 0;
     clearPixelsColorRedoHistory();
+}
+
+function drawSerializedPixel(pixel, color) {
+    undoActionArray.push(new Action(pixel, "drawBlank"));
+    pixel.div.style.backgroundColor = color;
+    pixel.updateColorHistoryArray();
+    pixel.isFilled = true;
 }
 
 function getRandomColor() {
@@ -198,11 +218,8 @@ function shadeOrLightenColor(color, option) {
     const [R, G, B] = color.slice(4, -1).split(", ");
 
     switch (option) {
-        case "shade":
-            return `rgb(${R - 25}, ${G - 25}, ${B - 25})`;
-
-        case "lighten":
-            return `rgb(${+R + 25}, ${+G + 25}, ${+B + 25})`;
+        case "shade": return `rgb(${R - 25}, ${G - 25}, ${B - 25})`;
+        case "lighten": return `rgb(${+R + 25}, ${+G + 25}, ${+B + 25})`;
     }
 }
 
@@ -214,14 +231,14 @@ function undo() {
 
     switch (action.type) {
         case "erase":
-            action.pixel.isFilled = 1;
+            action.pixel.isFilled = true;
             action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[action.pixel.colorHistoryArrayIndex];
             break;
 
         case "drawBlank":
         case "shadeBlank":
         case "lightenBlank":
-            action.pixel.isFilled = 0;
+            action.pixel.isFilled = false;
             action.pixel.colorHistoryArrayIndex--;
             action.pixel.div.style.backgroundColor = backgroundColorPicker.value;
             break;
@@ -234,7 +251,7 @@ function undo() {
 
         case "fillBlank":
             action.pixel.forEach(pixel => {
-                pixel.isFilled = 0;
+                pixel.isFilled = false;
                 pixel.colorHistoryArrayIndex--;
                 pixel.div.style.backgroundColor = backgroundColorPicker.value;
             });
@@ -256,14 +273,14 @@ function redo() {
 
     switch (action.type) {
         case "erase":
-            action.pixel.isFilled = 0;
+            action.pixel.isFilled = false;
             action.pixel.div.style.backgroundColor = backgroundColorPicker.value;
             break;
 
         case "drawBlank":
         case "shadeBlank":
         case "lightenBlank":
-            action.pixel.isFilled = 1;
+            action.pixel.isFilled = true;
             action.pixel.div.style.backgroundColor = action.pixel.colorHistoryArray[++action.pixel.colorHistoryArrayIndex];
             break;
 
@@ -275,7 +292,7 @@ function redo() {
 
         case "fillBlank":
             action.pixel.forEach(pixel => {
-                pixel.isFilled = 1;
+                pixel.isFilled = true;
                 pixel.div.style.backgroundColor = pixel.colorHistoryArray[++pixel.colorHistoryArrayIndex];
             });
             break;
@@ -302,6 +319,7 @@ function screenshot() {
         downloadLink.href = screenshotDataUrl;
         downloadLink.download = "screenshot.png";
         downloadLink.click();
+        downloadLink.remove();
     });
 }
 
@@ -312,9 +330,9 @@ function hex2rgb(hex) {
     return `rgb(${R}, ${G}, ${B})`;
 }
 
-getPixel = function (div) {
-    for (let i = 0; i < pixelsMatrix.rows; i++) {
-        for (let j = 0; j < pixelsMatrix.columns; j++) {
+function getPixel(div) {
+    for (let i = 0; i < pixelsMatrix.length; i++) {
+        for (let j = 0; j < pixelsMatrix.length; j++) {
             if (pixelsMatrix[i][j].div === div) {
                 return pixelsMatrix[i][j];
             }
@@ -322,46 +340,23 @@ getPixel = function (div) {
     }
 }
 
-getPixelRow = function (div) {
-    for (let i = 0; i < pixelsMatrix.rows; i++) {
-        for (let j = 0; j < pixelsMatrix.columns; j++) {
-            if (pixelsMatrix[i][j].div === div) {
-                return i;
-            }
-        }
-    }
+function getPixelRow(div) {
+    return +div.dataset.position.split(",")[0];
 }
 
-getPixelColumn = function (div) {
-    for (let i = 0; i < pixelsMatrix.rows; i++) {
-        for (let j = 0; j < pixelsMatrix.columns; j++) {
-            if (pixelsMatrix[i][j].div === div) {
-                return j;
-            }
-        }
-    }
+function getPixelColumn(div) {
+    return +div.dataset.position.split(",")[1];
 }
 
-function generateMatrix(row, col) {
-    let matrix = [];
-
-    for (let i = 0; i < row; i++) {
-        matrix[i] = [];
-
-        for (let j = 0; j < col; j++) {
-            matrix[i][j] = 0;
-        }
-    }
-
-    matrix.rows = row;
-    matrix.columns = col;
-
+function generateMatrix(n) {
+    let matrix = new Array(n);
+    for (let i = 0; i < n; i++) matrix[i] = new Array(n);
     return matrix;
 }
 
 function clearPixelsColorRedoHistory() {
-    for (let i = 0; i < pixelsMatrix.rows; i++) {
-        for (let j = 0; j < pixelsMatrix.columns; j++) {
+    for (let i = 0; i < pixelsMatrix.length; i++) {
+        for (let j = 0; j < pixelsMatrix.length; j++) {
             pixelsMatrix[i][j].calibrateColorHistoryArray();
         }
     }
@@ -382,16 +377,15 @@ function Pixel(div, isFilled) {
     }
 }
 
-function Action(pixel, type = null) {
+function Action(pixel, type) {
     this.pixel = pixel;
     this.type = type;
 }
 
 function FloodFillFilled(pixelsMatrix, row, column, filledColor, filledPixels) {
-    if (!validCoordinates(pixelsMatrix, row, column))
-        return;
+    if (!validCoordinates(pixelsMatrix, row, column)) return;
 
-    if ((pixelsMatrix[row][column].isFilled === 1
+    if ((pixelsMatrix[row][column].isFilled === true
         && pixelsMatrix[row][column].div.style.backgroundColor !== penColorPicker.rgbValue
         && pixelsMatrix[row][column].div.style.backgroundColor === filledColor)) {
 
@@ -407,12 +401,10 @@ function FloodFillFilled(pixelsMatrix, row, column, filledColor, filledPixels) {
 }
 
 function FloodFillBlank(pixelsMatrix, row, column, filledPixels) {
-    if (!validCoordinates(pixelsMatrix, row, column))
-        return;
+    if (!validCoordinates(pixelsMatrix, row, column)) return;
+    if (pixelsMatrix[row][column].isFilled === true) return;
 
-    if (pixelsMatrix[row][column].isFilled === 1) return;
-
-    pixelsMatrix[row][column].isFilled = 1;
+    pixelsMatrix[row][column].isFilled = true;
     pixelsMatrix[row][column].div.style.backgroundColor = penColorPicker.rgbValue;
     pixelsMatrix[row][column].updateColorHistoryArray();
     filledPixels.push(pixelsMatrix[row][column]);
@@ -424,19 +416,76 @@ function FloodFillBlank(pixelsMatrix, row, column, filledPixels) {
 }
 
 function validCoordinates(pixelsMatrix, row, column) {
-    return (row >= 0 && row < pixelsMatrix.rows && column >= 0 && column < pixelsMatrix.columns);
+    return (row >= 0 && row < pixelsMatrix.length && column >= 0 && column < pixelsMatrix.length);
 }
 
-//---------------------------------------------------------------------------------------------------------------------
-//Event listeners
+function activate() {
+    constructGrid();
+    drawingModeButton.classList.add("button-on");
+    gridLinesStatusOutput.textContent = gridLinesStatus;
+    if (gridLinesStatus === "ON") {
+        gridLinesButton.classList.add("button-on");
+    }
+    else {
+        gridLinesButton.classList.remove("button-on");
+    }
+    gridSizeOutput.textContent = `${gridSizeSlider.value} X ${gridSizeSlider.value}`;
+    penColorPicker.rgbValue = hex2rgb(penColorPicker.value);
+}
+
+function serializeGrid() {
+    const serializedData = {
+        gridSize: gridSizeSlider.value,
+        gridLinesStatus: gridLinesStatus,
+        penColor: penColorPicker.value,
+        backgroundColor: backgroundColorPicker.value,
+        pixels: []
+    };
+
+    for (let i = 0; i < pixelsMatrix.length; i++) {
+        for (let j = 0; j < pixelsMatrix.length; j++) {
+            const pixel = pixelsMatrix[i][j];
+            if (pixel.isFilled){
+                serializedData.pixels.push({
+                    position: pixel.div.dataset.position,
+                    color: pixel.div.style.backgroundColor,
+                });
+            }
+        }
+    }
+
+    return JSON.stringify(serializedData);
+}
+
+function deserializeGrid(jsonData) {
+    destructGrid();
+    const serializedData = JSON.parse(jsonData);
+    penColorPicker.value = serializedData.penColor;
+    backgroundColorPicker.value = serializedData.backgroundColor;
+    gridSizeSlider.value = serializedData.gridSize;
+    gridLinesStatus = serializedData.gridLinesStatus;
+    activate();
+
+    const n = gridSizeSlider.value;
+
+    for (let i = 0; i < serializedData.pixels.length; i++) {
+        let r = serializedData.pixels[i].position.split(",")[0];
+        let c = serializedData.pixels[i].position.split(",")[1];
+        drawSerializedPixel(pixelsMatrix[r][c], serializedData.pixels[i].color);
+    }
+}
+
+/*********************************************************************************************************************/
+// Event listeners                                                                                                    /
+/*********************************************************************************************************************/
 
 penColorPicker.addEventListener("input", () => {
     penColorPicker.rgbValue = hex2rgb(penColorPicker.value);
 });
 
 backgroundColorPicker.addEventListener("input", () => {
-    for (let i = 0; i < pixelsMatrix.rows; i++) {
-        for (let j = 0; j < pixelsMatrix.columns; j++) {
+    for (let i = 0; i < pixelsMatrix.length; i++) {
+        for (let j = 0; j < pixelsMatrix.length; j++) {
             if (pixelsMatrix[i][j].isFilled) continue;
             pixelsMatrix[i][j].div.style.backgroundColor = backgroundColorPicker.value;
         }
@@ -510,6 +559,48 @@ screenshotButton.addEventListener("transitionend", () => {
     screenshotButton.classList.remove("button-on");
 });
 
+saveButton.addEventListener("click", () => {
+    saveButton.classList.add("button-on");
+
+    const serializedData = serializeGrid();
+    const blob = new Blob([serializedData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "data.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+});
+
+saveButton.addEventListener("transitionend", () => {
+    saveButton.classList.remove("button-on");
+});
+
+loadButton.addEventListener("click", () => {
+    loadButton.classList.add("button-on");
+    loadInput.click();
+});
+
+loadInput.addEventListener("change", event => {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const serializedData = reader.result;
+            deserializeGrid(serializedData);
+            loadInput.value = "";
+        };
+        reader.readAsText(file);
+    }
+});
+
+loadButton.addEventListener("transitionend", () => {
+    loadButton.classList.remove("button-on");
+});
+
 document.addEventListener("keydown", event => {
     if ((event.ctrlKey || event.metaKey) && event.code === "KeyZ") {
         event.preventDefault();
@@ -524,17 +615,11 @@ document.addEventListener("keydown", event => {
     }
 });
 
-window.addEventListener("load", () => {
-    constructGrid();
-    drawingModeButton.classList.add("button-on");
-    gridLinesStatusOutput.textContent = gridLinesStatus;
-    if (gridLinesStatus === "ON") gridLinesButton.classList.add("button-on");
-    gridSizeOutput.textContent = `${gridSizeSlider.value} X ${gridSizeSlider.value}`;
-    penColorPicker.rgbValue = hex2rgb(penColorPicker.value);
-});
+window.addEventListener("load", activate);
 
-//---------------------------------------------------------------------------------------------------------------------
-// Date in footer
+/*********************************************************************************************************************/
+// Date in footer                                                                                                    /
+/*********************************************************************************************************************/
 
 const currentYearOutput = document.querySelector("#currentYear");
 currentYearOutput.textContent = new Date().getFullYear();

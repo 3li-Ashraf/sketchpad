@@ -16,7 +16,7 @@ body {
     font-family: 'Roboto', sans-serif;
 }
 
-.header {
+header {
     padding: 30px 0;
     text-align: center;
     font-family: 'Press Start 2P', cursive;
@@ -64,7 +64,7 @@ body {
 .grid-settings {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
 .settings-title {
@@ -104,14 +104,16 @@ input[type="color"]::-moz-color-swatch {
 
 .pen-fill-eraser-container,
 .shade-lighten-colorful-container,
-.undo-redo-container {
+.undo-redo-container,
+.save-load-container {
     display: flex;
     gap: 10px;
 }
 
 .pen-fill-eraser-container button,
 .shade-lighten-colorful-container button,
-.undo-redo-container button {
+.undo-redo-container button,
+.save-load-container button {
     flex: 1;
 }
 
@@ -127,7 +129,9 @@ input[type="color"]::-moz-color-swatch {
 #undoButton,
 #redoButton,
 #clearButton,
-#screenshotButton {
+#screenshotButton,
+#saveButton,
+#loadButton {
     transition: color 0.1s, background-color 0.1s;
 }
 
@@ -159,7 +163,7 @@ input[type="range"] {
     display: grid;
 }
 
-.footer {
+footer {
     padding: 10px 0;
     font-size: 18px;
     color: #3ea6ff;

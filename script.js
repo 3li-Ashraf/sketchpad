@@ -475,6 +475,47 @@ function deserializeGrid(jsonData) {
     }
 }
 
+function validateSerializedData(serializedData) {
+    try {
+        const data = JSON.parse(serializedData);
+
+        if (typeof data.gridSize !== 'number' || data.gridSize <= 0) {
+            return false;
+        }
+
+        if (typeof data.gridLinesStatus !== 'string' || (data.gridLinesStatus !== 'ON' && data.gridLinesStatus !== 'OFF')) {
+            return false;
+        }
+
+        if (typeof data.penColor !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(data.penColor)) {
+            return false;
+        }
+
+        if (typeof data.backgroundColor !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(data.backgroundColor)) {
+            return false;
+        }
+
+        if (!Array.isArray(data.pixels)) {
+            return false;
+        }
+
+        for (const pixel of data.pixels) {
+            if (typeof pixel.position !== 'string' || !/^\d+,\d+$/.test(pixel.position)) {
+                return false;
+            }
+
+            if (typeof pixel.color !== 'string' || !/^rgb\(\d{1,3}, \d{1,3}, \d{1,3}\)$/.test(pixel.color)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+    catch (e) {
+        return false;
+    }
+}
+
 /*********************************************************************************************************************/
 // Event listeners                                                                                                    /
 /*********************************************************************************************************************/
@@ -590,7 +631,14 @@ loadInput.addEventListener("change", event => {
         const reader = new FileReader();
         reader.onload = () => {
             const serializedData = reader.result;
-            deserializeGrid(serializedData);
+            
+            if (validateSerializedData(serializedData)) {
+                deserializeGrid(serializedData);
+            }
+            else {
+                alert("Invalid file format or data. Please check the file and try again.");
+            }
+
             loadInput.value = "";
         };
         reader.readAsText(file);

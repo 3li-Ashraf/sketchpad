@@ -435,7 +435,7 @@ function activate() {
 
 function serializeGrid() {
     const serializedData = {
-        gridSize: gridSizeSlider.value,
+        gridSize: Number(gridSizeSlider.value),
         gridLinesStatus: gridLinesStatus,
         penColor: penColorPicker.value,
         backgroundColor: backgroundColorPicker.value,

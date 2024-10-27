@@ -1,6 +1,6 @@
-# Sketchpad V2 🖌️
+# Sketchpad 🖌️
 
-Sketchpad V2 is a web-based drawing application built using React and TypeScript. It allows users to create and manipulate pixel art with a variety of tools and settings to customize the drawing experience.
+Sketchpad is a web-based drawing application built using React and TypeScript. It allows users to create and manipulate pixel art with a variety of tools and settings to customize the drawing experience.
 
 ## Table of Contents
 
@@ -39,11 +39,11 @@ To get started with Sketchpad V2, follow these steps:
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/3li-Ashraf/sketchpad-v2.git
+    git clone https://github.com/3li-Ashraf/sketchpad.git
     ```
 2. Navigate to the project directory:
     ```sh
-    cd sketchpad-v2
+    cd sketchpad
     ```
 3. Install the dependencies:
     ```sh
@@ -56,7 +56,7 @@ To get started with Sketchpad V2, follow these steps:
 
 ## Usage
 
-1. Open your browser and navigate to `http://localhost:5173/sketchpad-v2/`.
+1. Open your browser and navigate to `http://localhost:5173/sketchpad`.
 2. Use the tools and settings to create your pixel art.
 3. Save your work using the "Save Grid" button.
 4. Load a previously saved grid using the "Load Grid" button.

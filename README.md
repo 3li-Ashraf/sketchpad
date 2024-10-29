@@ -1,4 +1,4 @@
-# Sketchpad 🖌️
+# Sketchpad
 
 Sketchpad is a web-based drawing application built using React and TypeScript. It allows users to create and manipulate pixel art with a variety of tools and settings to customize the drawing experience.
 

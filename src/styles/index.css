@@ -1,15 +1,255 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-html,
-body,
-#root {
-  height: 100%;
+/* Single source of truth for the design tokens. Tailwind v4 reads them straight
+   from CSS, so `bg-surface`, `text-accent`, `font-pixeled` and `animate-spin-slow`
+   are generated from these declarations and there is no JS config to keep in
+   step. Source files are discovered automatically, so there is no `content` list
+   either. */
+@theme {
+  --color-surface: #181818;
+  --color-accent: #3ea6ff;
+  --color-grid-line: #9c9c9c;
+
+  --font-main: "Roboto", sans-serif;
+  --font-pixeled: "Press Start 2P", cursive;
+
+  --animate-spin-slow: spin 4s linear infinite;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Tailwind's Preflight already applies `margin: 0`, `padding: 0` and
+   `box-sizing: border-box` to every element, so only the full-height chain and
+   the page ground need declaring. Keep it inside `@layer base` — unlayered rules
+   outrank every layered utility, which would flatten `p-*`, `rounded-*`, etc. */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    /* The app paints `bg-surface` on its own root element, which stops at the
+       viewport. Anything the page reveals past that — a rubber-band overscroll
+       on iOS, the area behind a bounced scroll on Android — falls through to
+       the canvas ground, which would otherwise be white against a near-black
+       app. */
+    background-color: var(--color-surface);
+
+    /* Renders the platform's own widgets to match: the range input's focus
+       ring, scrollbars, and the color picker the swatch opens. Declared here as
+       well as in the document head, so it survives if the head is ever
+       regenerated. */
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  /* Outlining from the container keeps grid lines off the cells themselves, so
+     toggling them re-renders one element instead of every cell. `outline` is used
+     rather than `border` because it does not take part in layout. */
+  .canvas-surface--lined > * {
+    outline: 1px solid var(--color-grid-line);
+  }
+
+  /* The square, bordered control shared by every toolbar button, the color
+     swatch and the settings toggle — including what it looks like while it is
+     the selected tool or an active toggle, so that state is described once
+     rather than repeated as utility classes on each of them. Size is left to
+     utilities, which sit in a later layer and so can override the default. */
+  .toolbar-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--spacing) * 10);
+    height: calc(var(--spacing) * 10);
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius-md);
+    background-color: var(--color-surface);
+    color: var(--color-accent);
+    transition-property: color, background-color;
+    transition-timing-function: var(--default-transition-timing-function);
+    transition-duration: 75ms;
+  }
+
+  /* `:active` is scoped to buttons: a one-shot action flashes while pressed,
+     but the color swatch must keep showing its color rather than flash over it. */
+  .toolbar-control[data-active="true"],
+  button.toolbar-control:active {
+    background-color: var(--color-accent);
+    color: var(--color-surface);
+  }
+
+  .toolbar-control:disabled {
+    opacity: 0.4;
+  }
+
+  /* The grid size slider: the browser's own range control, restyled to sit with
+     the toolbar rather than with the operating system.
+
+     The filled part of the track is a hard gradient stop rather than a second
+     element, positioned by `--slider-progress` (0..1, set by the component).
+     That stop is inset by half a thumb at each end, so the fill meets the
+     thumb's center instead of running out from under it at the extremes. */
+  .grid-size-slider {
+    --slider-thumb-size: calc(var(--spacing) * 4);
+    --slider-track-height: calc(var(--spacing) * 1.5);
+    --slider-progress: 0;
+    --slider-fill-end: calc(
+      var(--slider-progress) * (100% - var(--slider-thumb-size)) +
+        var(--slider-thumb-size) / 2
+    );
+    --slider-track: color-mix(in srgb, var(--color-accent) 22%, var(--color-surface));
+    --slider-track-fill: linear-gradient(
+      to right,
+      var(--color-accent) 0 var(--slider-fill-end),
+      var(--slider-track) var(--slider-fill-end) 100%
+    );
+
+    appearance: none;
+    width: 100%;
+    height: var(--slider-thumb-size);
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .grid-size-slider:focus-visible {
+    outline: none;
+  }
+
+  /* WebKit and Firefox expose the track and thumb as separate pseudo-elements
+     that cannot be selected together — a browser drops the whole rule on a
+     selector it does not recognise — so each pair is declared on its own. */
+  .grid-size-slider::-webkit-slider-runnable-track {
+    height: var(--slider-track-height);
+    border-radius: 999px;
+    background: var(--slider-track-fill);
+  }
+
+  .grid-size-slider::-moz-range-track {
+    height: var(--slider-track-height);
+    border-radius: 999px;
+    background: var(--slider-track-fill);
+  }
+
+  .grid-size-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: var(--slider-thumb-size);
+    height: var(--slider-thumb-size);
+    /* WebKit aligns the thumb to the top of the track; Firefox centers it. */
+    margin-top: calc(
+      (var(--slider-track-height) - var(--slider-thumb-size)) / 2
+    );
+    border: 2px solid var(--color-surface);
+    border-radius: 999px;
+    background: var(--color-accent);
+    transition: box-shadow 75ms var(--default-transition-timing-function);
+  }
+
+  .grid-size-slider::-moz-range-thumb {
+    width: var(--slider-thumb-size);
+    height: var(--slider-thumb-size);
+    border: 2px solid var(--color-surface);
+    border-radius: 999px;
+    background: var(--color-accent);
+    transition: box-shadow 75ms var(--default-transition-timing-function);
+  }
+
+  /* A ring on hover and keyboard focus, matching the pressed state the toolbar
+     buttons use to say the same thing. */
+  .grid-size-slider:hover::-webkit-slider-thumb,
+  .grid-size-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 calc(var(--spacing) * 1.5)
+      color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+
+  .grid-size-slider:hover::-moz-range-thumb,
+  .grid-size-slider:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 calc(var(--spacing) * 1.5)
+      color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+
+  /* Hover/focus label, drawn from the `data-tooltip` attribute so it costs no
+     JavaScript and no extra DOM. The wrapper is what reacts to the pointer,
+     because a disabled button emits no events of its own.
+
+     It is filled with the accent and lettered in the surface color — the
+     inverse of the controls it labels, which are surface-filled and
+     accent-lettered. A tooltip that borrowed the buttons' own treatment would
+     read as one more button floating above the grid. */
+  .tooltip {
+    --tooltip-opacity: 0;
+    --tooltip-lift: calc(var(--spacing) * 1);
+    --tooltip-delay: 0ms;
+
+    position: relative;
+    display: flex;
+  }
+
+  /* Shown only while the pointer rests on the control, and only on devices that
+     have a pointer at all: a tap on a touch screen leaves `:hover` stuck on the
+     control it landed on, which would pin the label open until something else
+     was tapped. */
+  @media (hover: hover) {
+    .tooltip:hover {
+      --tooltip-opacity: 1;
+      --tooltip-lift: 0px;
+      /* Held back a beat on the way in, so sweeping the pointer across the grid
+         does not flash every label in turn. Reverting to 0ms means the label is
+         dismissed immediately on the way out. */
+      --tooltip-delay: 180ms;
+    }
+  }
+
+  /* Keyboard focus only. Plain `:focus` — or `:focus-within` — would keep the
+     label up after a mouse click, since clicking a button focuses it and the
+     focus outlives the pointer. */
+  .tooltip:has(:focus-visible) {
+    --tooltip-opacity: 1;
+    --tooltip-lift: 0px;
+    --tooltip-delay: 180ms;
+  }
+
+  .tooltip::after {
+    content: attr(data-tooltip);
+    bottom: calc(100% + var(--spacing) * 2.5);
+    padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    box-shadow: 0 calc(var(--spacing) * 1) calc(var(--spacing) * 3)
+      rgb(0 0 0 / 0.5);
+  }
+
+  /* The pointer: a square turned on its corner, half of it tucked behind the
+     bubble so only the tip shows. */
+  .tooltip::before {
+    content: "";
+    bottom: calc(100% + var(--spacing) * 1.5);
+    width: calc(var(--spacing) * 2);
+    height: calc(var(--spacing) * 2);
+    rotate: 45deg;
+    border-radius: 1px;
+  }
+
+  /* Both halves read the same three variables, so what "shown" means is stated
+     once and each trigger above only has to flip it. */
+  .tooltip::after,
+  .tooltip::before {
+    position: absolute;
+    left: 50%;
+    z-index: 10;
+    background-color: var(--color-accent);
+    color: var(--color-surface);
+    pointer-events: none;
+    opacity: var(--tooltip-opacity);
+    /* Rises the last few pixels into place as it fades in. */
+    translate: -50% var(--tooltip-lift);
+    transition-property: opacity, translate;
+    transition-duration: 120ms;
+    transition-timing-function: var(--default-transition-timing-function);
+    transition-delay: var(--tooltip-delay);
+  }
 }

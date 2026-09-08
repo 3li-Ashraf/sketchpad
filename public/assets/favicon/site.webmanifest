@@ -1,6 +1,12 @@
 {
   "name": "Sketchpad",
   "short_name": "Sketchpad",
+  "description": "A pixel-art drawing app with pen, eraser, fill and mirroring tools.",
+  "start_url": "../../",
+  "scope": "../../",
+  "display": "standalone",
+  "theme_color": "#181818",
+  "background_color": "#181818",
   "icons": [
     {
       "src": "./android-chrome-192x192.png",
@@ -12,8 +18,5 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ],
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff",
-  "display": "standalone"
+  ]
 }

@@ -9,6 +9,7 @@ import {
     clampGridSize,
     collectFillRegion,
     createBlankGrid,
+    isBlankGrid,
     isSupportedGridSize,
     MAX_GRID_SIZE,
     MIN_GRID_SIZE,
@@ -41,6 +42,19 @@ describe("createBlankGrid", () => {
 
         expect(colors).toHaveLength(16);
         expect(colors.every((color) => color === BLANK_CELL_COLOR)).toBe(true);
+    });
+});
+
+describe("isBlankGrid", () => {
+    it("is true for a grid nothing has been painted on", () => {
+        expect(isBlankGrid(createBlankGrid(4))).toBe(true);
+    });
+
+    it("is false once any cell holds another color, even the last", () => {
+        const colors = createBlankGrid(4);
+        colors[15] = "#000000";
+
+        expect(isBlankGrid(colors)).toBe(false);
     });
 });
 

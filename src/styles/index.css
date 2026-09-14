@@ -52,10 +52,11 @@
   }
 
   /* The square, bordered control shared by every toolbar button, the color
-     swatch and the settings toggle — including what it looks like while it is
-     the selected tool or an active toggle, so that state is described once
-     rather than repeated as utility classes on each of them. Size is left to
-     utilities, which sit in a later layer and so can override the default. */
+     swatch, the settings toggle and, stretched to fit a label, the buttons in a
+     dialog — including what it looks like while it is the selected tool or an
+     active toggle, so that state is described once rather than repeated as
+     utility classes on each of them. Size is left to utilities, which sit in a
+     later layer and so can override the default. */
   .toolbar-control {
     display: flex;
     align-items: center;
@@ -157,17 +158,67 @@
   }
 
   /* A ring on hover and keyboard focus, matching the pressed state the toolbar
-     buttons use to say the same thing. */
-  .grid-size-slider:hover::-webkit-slider-thumb,
+     buttons use to say the same thing. Hover is read off the track around the
+     input rather than the input itself, which ignores the pointer while moving
+     it would erase a drawing. */
+  .grid-size-track:hover .grid-size-slider::-webkit-slider-thumb,
   .grid-size-slider:focus-visible::-webkit-slider-thumb {
     box-shadow: 0 0 0 calc(var(--spacing) * 1.5)
       color-mix(in srgb, var(--color-accent) 35%, transparent);
   }
 
-  .grid-size-slider:hover::-moz-range-thumb,
+  .grid-size-track:hover .grid-size-slider::-moz-range-thumb,
   .grid-size-slider:focus-visible::-moz-range-thumb {
     box-shadow: 0 0 0 calc(var(--spacing) * 1.5)
       color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+
+  /* The modal every warning and failure is shown in, from `ui/common/Dialog`.
+     It is portalled to the body, outside the app's root element, so it inherits
+     none of the root's font or color and declares its own. Preflight's
+     `margin: 0` also takes away the `margin: auto` a browser centers a modal
+     dialog with, so that is restated. */
+  .modal-dialog {
+    width: min(calc(var(--spacing) * 96), calc(100% - var(--spacing) * 8));
+    margin: auto;
+    padding: calc(var(--spacing) * 6);
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius-md);
+    background-color: var(--color-surface);
+    color: var(--color-accent);
+    font-family: var(--font-main);
+    box-shadow: 0 calc(var(--spacing) * 2) calc(var(--spacing) * 8)
+      rgb(0 0 0 / 0.6);
+    transition-property: opacity, translate;
+    transition-duration: 120ms;
+    transition-timing-function: var(--default-transition-timing-function);
+  }
+
+  /* The dialog itself holds focus when it opens, so that no button does. A ring
+     drawn around the whole dialog — which a browser may do when it was opened
+     from the keyboard — would point at nothing in particular. */
+  .modal-dialog:focus {
+    outline: none;
+  }
+
+  .modal-dialog::backdrop {
+    background-color: rgb(0 0 0 / 0.6);
+    transition: opacity 120ms var(--default-transition-timing-function);
+  }
+
+  /* Fades in and rises the last few pixels into place, as the tooltips do. Only
+     on the way in: a dialog is unmounted the moment it is answered, so there is
+     nothing left to animate on the way out. A browser without `@starting-style`
+     simply shows it. */
+  @starting-style {
+    .modal-dialog[open] {
+      opacity: 0;
+      translate: 0 calc(var(--spacing) * 1);
+    }
+
+    .modal-dialog[open]::backdrop {
+      opacity: 0;
+    }
   }
 
   /* Hover/focus label, drawn from the `data-tooltip` attribute so it costs no

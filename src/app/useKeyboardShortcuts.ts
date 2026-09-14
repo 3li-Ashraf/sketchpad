@@ -26,6 +26,13 @@ export const useKeyboardShortcuts = (): void => {
             if (!isUndo && !isRedo) return;
 
             event.preventDefault();
+
+            // Nothing is undone behind a dialog. An open modal makes the page
+            // inert to the pointer and to focus, but not to this listener on the
+            // window, and a step undone underneath a question would change what
+            // the question was about.
+            if (document.querySelector("dialog[open]")) return;
+
             if (isRedo) redo();
             else undo();
         };

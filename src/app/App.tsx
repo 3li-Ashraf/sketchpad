@@ -23,15 +23,18 @@ export const App: React.FC = () => {
     // Dismisses the panel when a press lands outside it. The toggle has to be
     // excluded, or it would look dead: this listener would close the panel on
     // `pointerdown` and the button's own `onClick` would immediately reopen it.
+    // So do dialogs: the toolbar opens them, but they are portalled out of it,
+    // and answering one would otherwise close the panel it was asked from.
     useEffect(() => {
         if (!isToolbarOpen) return;
 
         const handlePointerDown = (event: PointerEvent) => {
-            const target = event.target as Node;
+            const target = event.target as Element;
 
             if (
                 toolbarRef.current?.contains(target) ||
-                toggleRef.current?.contains(target)
+                toggleRef.current?.contains(target) ||
+                target.closest("dialog")
             ) {
                 return;
             }

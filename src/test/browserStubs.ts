@@ -156,6 +156,25 @@ export const stubCanvas2dUnavailable = (): void => {
 };
 
 /**
+ * jsdom defines `HTMLDialogElement` but implements none of it — `showModal` and
+ * `close` are missing outright, so the first dialog opened would throw. This
+ * installs the one part the app's dialogs rely on, the `open` attribute that
+ * marks a dialog as shown, and none of what a browser does besides: no top
+ * layer, no inert page behind it, no focus trap, and no `cancel` event on
+ * Escape. A test that needs that last one dispatches it itself.
+ */
+export const installDialog = (): void => {
+    Object.assign(HTMLDialogElement.prototype, {
+        showModal(this: HTMLDialogElement) {
+            this.setAttribute("open", "");
+        },
+        close(this: HTMLDialogElement) {
+            this.removeAttribute("open");
+        },
+    });
+};
+
+/**
  * jsdom implements no pointer capture at all, so every call throws and the
  * production fallback swallows it — which would mean the capture path was never
  * exercised. A real browser captures, so the suite installs a working in-memory

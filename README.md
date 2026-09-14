@@ -10,7 +10,9 @@ A pixel-art drawing app built with React, TypeScript, Zustand and Tailwind CSS.
 
 **History** — undo and redo a whole stroke at a time, up to 100 steps back, with <kbd>Ctrl</kbd>+<kbd>Z</kbd> to undo and <kbd>Ctrl</kbd>+<kbd>Y</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> to redo (<kbd>Cmd</kbd> on macOS).
 
-**Files** — save a sketch to a compact binary `.skpd` file and load it back, or export the artwork as a PNG at 50 pixels per cell.
+**Files** — save a sketch to a compact binary `.skpd` file and load it back, or export the artwork as a PNG at 50 pixels per cell. A file that cannot be opened is reported with the reason: not a sketch, from an unsupported format, damaged, or no longer readable.
+
+**Warnings** — resizing the grid or loading a file erases the drawing and its history, so either one asks first whenever there is something to lose. Each question has a "Don't ask again" box that lasts until the page is reloaded.
 
 ## Getting started
 
@@ -78,8 +80,8 @@ one component that uses it instead of in a shared `hooks/` bucket:
 ```
 ui/
   canvas/   Canvas, CanvasCell, usePaintGestures
-  toolbar/  Toolbar, ToolbarButton, ColorPicker, ColorfulPenIcon, GridSizeSlider, useSketchFiles
-  common/   Tooltip, and the panel sizes the canvas and toolbar must agree on
+  toolbar/  Toolbar, ToolbarButton, ColorPicker, ColorfulPenIcon, GridSizeSlider, useGridResize, useSketchFiles
+  common/   Dialog, Tooltip, and the panel sizes the canvas and toolbar must agree on
 ```
 
 **Constants live with the code that gives them meaning** — grid bounds in
@@ -129,16 +131,37 @@ native color input is the one source that reports another case, and `setPenColor
 normalizes it; colors decoded from a file are already uppercase, because
 `rgbToHex` builds them that way.
 
-**Failures are reported in the page.** Saving, loading and exporting run through
-`useSketchFiles`, which puts any failure into a `role="alert"` message in the
-toolbar. That covers a file that cannot be decoded and, separately, one that
-cannot be read at all — `arrayBuffer` rejects for a file moved or deleted since
-it was picked, which the browser only discovers after the picker has closed.
+**Failures are reported in a dialog.** Saving, loading and exporting run through
+`useSketchFiles`, which reports any failure in a native `<dialog>` opened with
+`showModal`. A load failure says why: `parseSketch` returns a reason rather than
+null — not a sketch at all, a format this version does not know, or damaged —
+and there is a fourth the decoder never sees, a file that cannot be read at all:
+`arrayBuffer` rejects for a file moved or deleted since it was picked, which the
+browser only discovers after the picker has closed. Every failure offers a next
+step beside Close: a failed load offers to choose another file, and a failed
+save or export offers to try again. No button starts focused — the dialog takes
+focus itself, so Enter presses nothing until a button is chosen — and both
+buttons look alike, each painted blue only while the pointer is over it.
+
+**Replacing a drawing asks first.** Resizing and loading a file are the two
+actions that discard a drawing without leaving an undo step, so both ask whenever
+`selectHasWorkToLose` finds something to lose: a painted cell, or any history at
+all, since a cleared grid is still one undo away from its drawing. Over a drawing
+the slider is locked (`useGridResize`): the input ignores the pointer, and the
+first press on it, or the first key that would step it, asks before anything
+moves. Unlocking it erases nothing by itself: the drawing goes only once the
+slider is moved again and the size actually changes, and the lock comes back as
+soon as the drawing changes. A file is asked about only once it has decoded, so a
+bad file raises its failure and nothing else. Each "Don't ask again" box sets a
+flag in the store, which is not persisted, so it lasts until the page is
+reloaded. Dialogs portal themselves to the body, because the collapsed toolbar is
+`display: none` and a modal inside it would be invisible, and the undo shortcuts
+are ignored while one is open.
 
 **The bundle is split app-from-vendor.** React and the icon set are most of its
 weight and change only on a dependency upgrade, so `codeSplitting` in
 `vite.config.ts` puts them in their own content-hashed chunk: a deploy that
-touches only app code invalidates about 6 kB gzipped rather than the whole 69 kB.
+touches only app code invalidates about 8 kB gzipped rather than the whole 71 kB.
 
 ## Styling
 
@@ -146,7 +169,7 @@ Tailwind is configured from CSS. `@theme` in `src/styles/index.css` is the singl
 
 The two fonts those tokens name are self-hosted from `@fontsource`, imported in `src/main.tsx` and bundled by Vite, so the app makes no third-party requests. Only the faces in use are imported — Roboto 400 and 500, Press Start 2P 400 — and only the latin subset of each, since every string the app renders is fixed English.
 
-Icons come from `react-icons`. The grid size control is a native `<input type="range">` restyled through its track and thumb pseudo-elements, and the tooltip is a pair of CSS `::after`/`::before` rules reading a `data-tooltip` attribute, so it costs no JavaScript and no extra DOM. The shared look of the toolbar buttons, the color swatch and the settings toggle is one `.toolbar-control` rule rather than utility classes repeated on each.
+Icons come from `react-icons`. The grid size control is a native `<input type="range">` restyled through its track and thumb pseudo-elements, and the tooltip is a pair of CSS `::after`/`::before` rules reading a `data-tooltip` attribute, so it costs no JavaScript and no extra DOM. The shared look of the toolbar buttons, the color swatch, the settings toggle and the dialog buttons is one `.toolbar-control` rule rather than utility classes repeated on each. Dialogs are the browser's own `<dialog>`, styled by `.modal-dialog`, which restates `margin: auto` because Preflight's reset takes away the centering a modal dialog otherwise gets for free.
 
 The app is dark throughout, and two declarations in `@layer base` make the rest of the page agree with it. `color-scheme: dark` on `html` is what renders the platform's own widgets to match — the color picker the swatch opens, scrollbars, the range input's focus ring — and a `background-color` there covers anything the app's own root element does not, such as an iOS rubber-band overscroll, which would otherwise show white behind a near-black app. The same color is declared as `theme-color` in `index.html` and in the web manifest, so the browser chrome and an installed app's splash screen match rather than flashing white.
 
@@ -177,7 +200,7 @@ Color count alone does not decide it, because deflate has already removed the re
 
 Cells are row-major in both modes. A 64×64 sketch lands at roughly 600 bytes to 1 kB for ordinary artwork, a couple of dozen bytes for a blank canvas, and up to about 12 kB in the worst case — every cell an unrelated, incompressible color, as a canvas fully covered by the colorful pen tends to produce — against roughly 40 kB for the same grid stored as JSON hex strings.
 
-Loading treats the file as hostile. The magic bytes are checked; the grid size is range-checked **before** it is used to size anything; each decoder requires the payload length to match the cell count exactly; and palette indices are checked against the palette length, since a bit width can encode indices past its end. Corruption is caught by the zlib checksum, which the format gets for six bytes by using zlib-wrapped deflate rather than `deflate-raw`. Anything that fails returns null and the app reports it rather than throwing.
+Loading treats the file as hostile. The magic bytes are checked; the grid size is range-checked **before** it is used to size anything; each decoder requires the payload length to match the cell count exactly; and palette indices are checked against the palette length, since a bit width can encode indices past its end. Corruption is caught by the zlib checksum, which the format gets for six bytes by using zlib-wrapped deflate rather than `deflate-raw`. Anything that fails returns a reason rather than throwing — `not-a-sketch` when the magic bytes are wrong, `unsupported` for a grid size or payload mode this version does not know, and `damaged` for everything else — and the app puts it into words for the file that was picked.
 
 ## PNG export
 
@@ -185,12 +208,12 @@ The sketch is drawn once at one image pixel per cell, then blitted up to full si
 
 ## Tests
 
-`npm test` runs the suite — 229 tests across 14 files; `npm run test:coverage`
-adds a report, and currently reports 100% of lines and 99.8% of statements.
+`npm test` runs the suite — 303 tests across 15 files; `npm run test:coverage`
+adds a report, and currently reports 100% of lines and 99.9% of statements.
 Tests sit beside the code they cover and mirror the layers above, with shared
 helpers in `src/test/`: store helpers, deterministic sketch fixtures, and stubs
 for the browser APIs jsdom does not implement (canvas 2D, object URLs, pointer
-capture).
+capture, dialogs).
 
 Two things the suite deliberately cannot prove, because jsdom does not implement
 them, are worth knowing about before changing the code they cover. The PNG export
@@ -204,6 +227,24 @@ file input, a corrupted file was rejected by the real zlib checksum, and the
 exported PNG decoded to 1600×1600 with hard cell edges — pure white at x=49
 against pure black at x=50, which is what nearest-neighbour scaling has to
 produce and what smoothing would blur.
+
+The dialog stub is a third such gap: it sets `open` and nothing more, so the top
+layer, the inert page behind a modal, focus handling and Escape all go untested.
+Those were checked by hand in Chrome 152. Against this revision, the resize,
+replace, not-a-sketch, unreadable, save and export dialogs each took focus
+themselves, with no button or checkbox focused and no outline drawn; in the
+resize question, Tab moved focus to its checkbox; and a `cancel` raised through
+`requestClose` dismissed the question and handed focus back to the slider.
+Against an earlier state of this change, before the dialog reached its final
+form: a press on the thumb or the track opened the resize question without moving
+the slider; unlocking left the drawing and the size as they were, and the next
+press on the track resized live; at 375 px wide the dialog fit with a 19 px
+margin each side, and answering it left the toolbar open; pointer input and
+<kbd>Ctrl</kbd>+<kbd>Z</kbd> did nothing behind an open dialog; a `close` the app
+had not asked for dismissed it; "Don't ask again" held for the rest of the visit;
+and a hovered button, read with its color transition switched off, was painted
+blue. `requestClose` fires the same `cancel` event as Escape, but a real Escape
+key press was not tested, because the test browser could not deliver one.
 
 ## Acknowledgements
 

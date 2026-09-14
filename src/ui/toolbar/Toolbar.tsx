@@ -1,8 +1,8 @@
 /**
  * @file The settings panel: every control the editor offers, wired to the store.
  * It is a declarative arrangement and holds no logic of its own — the drawing
- * rules are in the store, and saving, loading and exporting are in
- * `useSketchFiles`.
+ * rules are in the store, resizing is in `useGridResize`, and saving, loading
+ * and exporting are in `useSketchFiles`.
  */
 
 import { BiSolidEraser } from "react-icons/bi";
@@ -17,7 +17,9 @@ import {
     selectCanUndo,
     useSketchStore,
 } from "../../state/sketchStore";
+import { useGridResize } from "./useGridResize";
 import { useSketchFiles } from "./useSketchFiles";
+import { ConfirmDialog, NoticeDialog } from "../common/Dialog";
 import {
     EDITOR_PANEL_HEIGHT,
     TOOLBAR_PANEL_HEIGHT,
@@ -35,7 +37,6 @@ interface ToolbarProps {
 export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
     const penColor = useSketchStore((state) => state.penColor);
     const tool = useSketchStore((state) => state.tool);
-    const gridSize = useSketchStore((state) => state.gridSize);
     const mirrorX = useSketchStore((state) => state.mirrorX);
     const mirrorY = useSketchStore((state) => state.mirrorY);
     const showGridLines = useSketchStore((state) => state.showGridLines);
@@ -46,19 +47,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
     const redo = useSketchStore((state) => state.redo);
     const setPenColor = useSketchStore((state) => state.setPenColor);
     const setTool = useSketchStore((state) => state.setTool);
-    const setGridSize = useSketchStore((state) => state.setGridSize);
     const clearGrid = useSketchStore((state) => state.clearGrid);
     const toggleMirrorX = useSketchStore((state) => state.toggleMirrorX);
     const toggleMirrorY = useSketchStore((state) => state.toggleMirrorY);
     const toggleGridLines = useSketchStore((state) => state.toggleGridLines);
 
+    const { gridSize, isLocked, resize, allowResize, resizeDialog } =
+        useGridResize();
+
     const {
         fileInputRef,
-        error,
         saveSketch,
         exportPng,
         openFilePicker,
         loadSelectedFile,
+        failureDialog,
+        replaceDialog,
     } = useSketchFiles();
 
     return (
@@ -69,7 +73,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
         >
             <h2 className="font-pixeled text-center text-lg">Settings</h2>
 
-            <GridSizeSlider gridSize={gridSize} onChange={setGridSize} />
+            <GridSizeSlider
+                gridSize={gridSize}
+                isLocked={isLocked}
+                onChange={resize}
+                onBeforeChange={allowResize}
+            />
 
             <div className="grid grid-cols-2 place-items-center gap-4 lg:gap-5 xl:gap-8">
                 <ToolbarButton
@@ -155,16 +164,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
                 </ToolbarButton>
             </div>
 
-            {/* Where `useSketchFiles` surfaces a failure. Rendered conditionally
-                rather than reserved, so the panel's other rows redistribute under
-                `justify-between` when it appears; the panel itself is a fixed
-                height and does not grow. */}
-            {error && (
-                <p role="alert" className="text-sm text-center max-w-[12rem]">
-                    {error}
-                </p>
-            )}
-
             <input
                 ref={fileInputRef}
                 type="file"
@@ -173,6 +172,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
                 accept={SKETCH_FILE_EXTENSION}
                 onChange={loadSelectedFile}
             />
+
+            {/* Rendered here, where their state lives, but shown outside the
+                panel: each dialog portals itself to the body. */}
+            {resizeDialog && <ConfirmDialog {...resizeDialog} />}
+            {replaceDialog && <ConfirmDialog {...replaceDialog} />}
+            {failureDialog && <NoticeDialog {...failureDialog} />}
         </aside>
     );
 };

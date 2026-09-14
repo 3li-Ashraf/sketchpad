@@ -63,9 +63,9 @@ export const deflate = (bytes: Bytes): Promise<Bytes> =>
 /**
  * Rejects on input that is corrupted or not deflate output at all. Callers are
  * expected to treat a rejection as "not a readable file" rather than let it
- * escape — `parseSketch` catches it and returns null, which `useSketchFiles`
- * turns into a message in the page. `deflate` carries no such contract; its own
- * failures are caught separately, where the sketch is saved.
+ * escape — `parseSketch` catches it and reports the file as damaged, which
+ * `useSketchFiles` reports in a dialog. `deflate` carries no such contract; its
+ * own failures are caught separately, where the sketch is saved.
  */
 export const inflate = (bytes: Bytes): Promise<Bytes> =>
     collect(streamOf(bytes).pipeThrough(new DecompressionStream(FORMAT)));

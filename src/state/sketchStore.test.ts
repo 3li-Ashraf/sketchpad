@@ -15,7 +15,12 @@ import {
 import { MAX_HISTORY_ENTRIES } from "../domain/history";
 import { DEFAULT_PEN_COLOR, DEFAULT_TOOL } from "../domain/tools";
 import { paintStroke, store, switchToGridSize } from "../test/storeHelpers";
-import { selectCanRedo, selectCanUndo, selectSketch } from "./sketchStore";
+import {
+    selectCanRedo,
+    selectCanUndo,
+    selectHasWorkToLose,
+    selectSketch,
+} from "./sketchStore";
 
 const PEN_COLOR = "#123456";
 
@@ -506,6 +511,82 @@ describe("loadSketch", () => {
         colors[0] = "#3EA6FF";
 
         expect(store().colors[0]).toBe(BLANK_CELL_COLOR);
+    });
+});
+
+describe("asking before the drawing is replaced", () => {
+    it("asks before both a resize and a load to begin with", () => {
+        expect(store().askBeforeResize).toBe(true);
+        expect(store().askBeforeReplace).toBe(true);
+    });
+
+    it("stops asking before a resize without touching loads", () => {
+        store().stopAskingBeforeResize();
+
+        expect(store().askBeforeResize).toBe(false);
+        expect(store().askBeforeReplace).toBe(true);
+    });
+
+    it("stops asking before a load without touching resizes", () => {
+        store().stopAskingBeforeReplace();
+
+        expect(store().askBeforeReplace).toBe(false);
+        expect(store().askBeforeResize).toBe(true);
+    });
+
+    it("keeps the choice through the resizes and loads it outlives", () => {
+        store().stopAskingBeforeResize();
+        store().stopAskingBeforeReplace();
+
+        store().setGridSize(8);
+        store().loadSketch({ gridSize: 4, colors: createBlankGrid(4) });
+
+        expect(store().askBeforeResize).toBe(false);
+        expect(store().askBeforeReplace).toBe(false);
+    });
+});
+
+describe("selectHasWorkToLose", () => {
+    it("is false for a blank grid with no history", () => {
+        expect(selectHasWorkToLose(store())).toBe(false);
+    });
+
+    it("is true once a cell is painted", () => {
+        paintStroke(0);
+
+        expect(selectHasWorkToLose(store())).toBe(true);
+    });
+
+    it("is true for a painted grid with no history, as a loaded sketch is", () => {
+        const colors = createBlankGrid(4);
+        colors[15] = PEN_COLOR;
+        store().loadSketch({ gridSize: 4, colors });
+
+        expect(selectCanUndo(store())).toBe(false);
+        expect(selectHasWorkToLose(store())).toBe(true);
+    });
+
+    it("is true for a cleared grid, since the clear can still be undone", () => {
+        paintStroke(0);
+        store().clearGrid();
+
+        expect(isBlank()).toBe(true);
+        expect(selectHasWorkToLose(store())).toBe(true);
+    });
+
+    it("is true for a grid undone back to blank, since it can still be redone", () => {
+        paintStroke(0);
+        store().undo();
+
+        expect(isBlank()).toBe(true);
+        expect(selectHasWorkToLose(store())).toBe(true);
+    });
+
+    it("is false again once a resize has replaced the drawing", () => {
+        paintStroke(0);
+        store().setGridSize(8);
+
+        expect(selectHasWorkToLose(store())).toBe(false);
     });
 });
 

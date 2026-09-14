@@ -14,6 +14,7 @@ import {
     createBlankGrid,
     DEFAULT_GRID_SIZE,
     forEachMirroredCell,
+    isBlankGrid,
     type Sketch,
 } from "../domain/grid";
 import {
@@ -39,6 +40,14 @@ interface SketchState extends Sketch {
     mirrorX: boolean;
     mirrorY: boolean;
     showGridLines: boolean;
+    /**
+     * Whether resizing over a drawing, or loading a file over one, asks first.
+     * Each is switched off by the "Don't ask again" box in its own dialog and
+     * never switched back on: the store is not persisted, so the choice lasts
+     * until the page is reloaded, which is exactly as long as it is meant to.
+     */
+    askBeforeResize: boolean;
+    askBeforeReplace: boolean;
     undoStack: HistoryEntry[];
     redoStack: HistoryEntry[];
     /**
@@ -57,6 +66,8 @@ interface SketchActions {
     toggleMirrorX: () => void;
     toggleMirrorY: () => void;
     toggleGridLines: () => void;
+    stopAskingBeforeResize: () => void;
+    stopAskingBeforeReplace: () => void;
     /**
      * A stroke runs as `beginStroke`, then any number of `paintCells`, then
      * `endStroke`; that pairing is what collapses a drag into one undo step.
@@ -96,6 +107,8 @@ export const useSketchStore = create<SketchStore>((set, get) => ({
     mirrorX: false,
     mirrorY: false,
     showGridLines: true,
+    askBeforeResize: true,
+    askBeforeReplace: true,
 
     // Normalized here because the native color input reports lowercase. This is
     // the only path into the store that can carry another case; colors from a
@@ -120,6 +133,10 @@ export const useSketchStore = create<SketchStore>((set, get) => ({
 
     toggleGridLines: () =>
         set((state) => ({ showGridLines: !state.showGridLines })),
+
+    stopAskingBeforeResize: () => set({ askBeforeResize: false }),
+
+    stopAskingBeforeReplace: () => set({ askBeforeReplace: false }),
 
     beginStroke: () => set({ strokeBaseline: get().colors }),
 
@@ -300,6 +317,21 @@ export const selectCanUndo = (state: SketchStore): boolean =>
 
 export const selectCanRedo = (state: SketchStore): boolean =>
     state.redoStack.length > 0;
+
+/**
+ * Whether replacing the drawing — by resizing, or by loading a file — would
+ * destroy anything: a painted cell, or a step that could still be undone or
+ * redone. History counts on its own, because a cleared grid looks blank while
+ * the clear itself is still one undo away.
+ *
+ * Cheap enough to subscribe to: history settles it at once, and otherwise the
+ * scan stops at the first painted cell, so a full pass over the grid happens
+ * only while it is blank with no history — at most 4096 comparisons a change.
+ */
+export const selectHasWorkToLose = (state: SketchStore): boolean =>
+    state.undoStack.length > 0 ||
+    state.redoStack.length > 0 ||
+    !isBlankGrid(state.colors);
 
 /** The drawing on its own, without the editor state that surrounds it. */
 export const selectSketch = ({ gridSize, colors }: SketchStore): Sketch => ({

@@ -51,6 +51,10 @@ export const isSupportedGridSize = (gridSize: number): boolean =>
 export const createBlankGrid = (gridSize: number): string[] =>
     new Array<string>(gridSize * gridSize).fill(BLANK_CELL_COLOR);
 
+/** Whether no cell has been painted, which is to say every one is blank. */
+export const isBlankGrid = (colors: readonly string[]): boolean =>
+    colors.every((color) => color === BLANK_CELL_COLOR);
+
 export const toCellIndex = (
     { row, column }: CellPosition,
     gridSize: number

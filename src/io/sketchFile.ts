@@ -199,35 +199,67 @@ const decodePalettePayload = (
 };
 
 /**
- * Reads a save file, returning null for anything that is not a sketch this app
+ * Why a file could not be read as a sketch, in terms a person can act on:
+ *
+ * - `not-a-sketch` — the file does not start with the magic bytes, so it was
+ *   never a save file at all: a PNG, a text file, an empty file.
+ * - `unsupported` — the magic bytes are right, but the header declares a grid
+ *   size or payload mode this version does not know. The header is intact
+ *   enough to trust that much, so this reads as a file from another version
+ *   rather than a broken one.
+ * - `damaged` — the header is fine but the file does not hold together: cut off
+ *   inside the header, a body that fails the zlib checksum or is not deflate
+ *   data, a payload of the wrong length, or a palette index past the palette.
+ */
+export type SketchParseFailure = "not-a-sketch" | "unsupported" | "damaged";
+
+export type SketchParseResult =
+    | { ok: true; sketch: Sketch }
+    | { ok: false; reason: SketchParseFailure };
+
+const failure = (reason: SketchParseFailure): SketchParseResult => ({
+    ok: false,
+    reason,
+});
+
+/**
+ * Reads a save file, returning the sketch or the reason it is not one this app
  * can render.
  *
  * The input is a user-chosen file and is treated as hostile: the magic bytes are
  * checked, the grid size is range-checked before it is used to size anything,
  * each decoder requires the payload length to match the cell count exactly, and
  * palette indices are checked against the palette length. Corruption is caught
- * by the zlib checksum. Every failure returns null rather than throwing, so the
+ * by the zlib checksum. Every failure is returned rather than thrown, so the
  * caller has one thing to handle.
  *
  * Takes `Bytes` rather than an `ArrayBuffer` so the caller owns the single copy
  * the decode needs. Those bytes must not be mutated while the promise is
  * pending.
  */
-export const parseSketch = async (file: Bytes): Promise<Sketch | null> => {
-    if (file.length < HEADER_SIZE) return null;
-    if (MAGIC.some((byte, at) => file[at] !== byte)) return null;
+export const parseSketch = async (file: Bytes): Promise<SketchParseResult> => {
+    // The magic is compared before the header length is, so a file cut off
+    // partway through a genuine header is reported as damaged, while a short
+    // file that never started with the magic is simply not a sketch.
+    if (file.length < MAGIC.length || MAGIC.some((byte, at) => file[at] !== byte)) {
+        return failure("not-a-sketch");
+    }
+    if (file.length < HEADER_SIZE) return failure("damaged");
 
     const gridSize = file[GRID_SIZE_OFFSET];
-    if (!isSupportedGridSize(gridSize)) return null;
-
     const mode = file[MODE_OFFSET];
-    if (mode !== PALETTE_MODE && mode !== RGB_MODE) return null;
+    if (
+        !isSupportedGridSize(gridSize) ||
+        (mode !== PALETTE_MODE && mode !== RGB_MODE)
+    ) {
+        return failure("unsupported");
+    }
 
     let payload: Bytes;
     try {
         payload = await inflate(file.subarray(HEADER_SIZE) as Bytes);
     } catch {
-        return null;
+        return failure("damaged");
     }
 
     const cellCount = gridSize * gridSize;
@@ -236,5 +268,5 @@ export const parseSketch = async (file: Bytes): Promise<Sketch | null> => {
             ? decodePalettePayload(payload, cellCount)
             : decodeRgbPayload(payload, cellCount);
 
-    return colors && { gridSize, colors };
+    return colors ? { ok: true, sketch: { gridSize, colors } } : failure("damaged");
 };

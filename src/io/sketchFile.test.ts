@@ -1,14 +1,20 @@
 /**
  * @file Covers `io/sketchFile`: that a round trip is pixel-identical at every
  * grid size, that the byte layout is what the header documents, and that a
- * malformed or hostile file is refused rather than trusted.
+ * malformed or hostile file is refused, with the right reason, rather than
+ * trusted.
  */
 
 import { describe, expect, it } from "vitest";
-import { createBlankGrid, MAX_GRID_SIZE } from "../domain/grid";
+import { createBlankGrid, MAX_GRID_SIZE, type Sketch } from "../domain/grid";
 import { artworkSketch, rainbowSketch } from "../test/sketchFixtures";
 import { deflate, type Bytes } from "./compression";
-import { parseSketch, serializeSketch } from "./sketchFile";
+import {
+    parseSketch,
+    serializeSketch,
+    type SketchParseFailure,
+    type SketchParseResult,
+} from "./sketchFile";
 
 // Re-declared rather than imported, because they are private to the module under
 // test: a change to the layout should break these tests instead of moving with it.
@@ -17,6 +23,13 @@ const HEADER_SIZE = 6;
 const PALETTE_MODE = 0;
 const RGB_MODE = 1;
 const MAX_PALETTE_LENGTH = 255;
+
+const decoded = (sketch: Sketch): SketchParseResult => ({ ok: true, sketch });
+
+const rejected = (reason: SketchParseFailure): SketchParseResult => ({
+    ok: false,
+    reason,
+});
 
 /**
  * Wraps an arbitrary payload in a valid header and deflates it. Reaching the
@@ -45,20 +58,26 @@ describe("round trip", () => {
         async (gridSize) => {
             const sketch = artworkSketch(gridSize);
 
-            expect(await parseSketch(await serializeSketch(sketch))).toEqual(sketch);
+            expect(await parseSketch(await serializeSketch(sketch))).toEqual(
+                decoded(sketch)
+            );
         }
     );
 
     it("restores a blank canvas", async () => {
         const sketch = { gridSize: 16, colors: createBlankGrid(16) };
 
-        expect(await parseSketch(await serializeSketch(sketch))).toEqual(sketch);
+        expect(await parseSketch(await serializeSketch(sketch))).toEqual(
+            decoded(sketch)
+        );
     });
 
     it("restores a sketch where every cell is a different color", async () => {
         const sketch = rainbowSketch(32);
 
-        expect(await parseSketch(await serializeSketch(sketch))).toEqual(sketch);
+        expect(await parseSketch(await serializeSketch(sketch))).toEqual(
+            decoded(sketch)
+        );
     });
 
     it("preserves colors a lossy encoder would round", async () => {
@@ -76,7 +95,9 @@ describe("round trip", () => {
             ],
         };
 
-        expect(await parseSketch(await serializeSketch(sketch))).toEqual(sketch);
+        expect(await parseSketch(await serializeSketch(sketch))).toEqual(
+            decoded(sketch)
+        );
     });
 });
 
@@ -95,10 +116,12 @@ describe("header", () => {
         );
         const file = await fileWith(payload, { gridSize: 2, mode: RGB_MODE });
 
-        expect(await parseSketch(file)).toEqual({
-            gridSize: 2,
-            colors: ["#000000", "#FFFFFF", "#3EA6FF", "#123456"],
-        });
+        expect(await parseSketch(file)).toEqual(
+            decoded({
+                gridSize: 2,
+                colors: ["#000000", "#FFFFFF", "#3EA6FF", "#123456"],
+            })
+        );
     });
 });
 
@@ -108,7 +131,7 @@ describe("payload mode", () => {
         const file = await serializeSketch(sketch);
 
         expect(file[5]).toBe(PALETTE_MODE);
-        expect(await parseSketch(file)).toEqual(sketch);
+        expect(await parseSketch(file)).toEqual(decoded(sketch));
     });
 
     it("falls back to RGB mode when a palette cannot address the colors, and round-trips it", async () => {
@@ -116,7 +139,7 @@ describe("payload mode", () => {
         const file = await serializeSketch(sketch);
 
         expect(file[5]).toBe(RGB_MODE);
-        expect(await parseSketch(file)).toEqual(sketch);
+        expect(await parseSketch(file)).toEqual(decoded(sketch));
     });
 
     it("picks RGB mode when it measures smaller, though a palette would fit", async () => {
@@ -131,7 +154,7 @@ describe("payload mode", () => {
 
         expect(new Set(sketch.colors).size).toBeLessThan(MAX_PALETTE_LENGTH);
         expect(file[5]).toBe(RGB_MODE);
-        expect(await parseSketch(file)).toEqual(sketch);
+        expect(await parseSketch(file)).toEqual(decoded(sketch));
     });
 
     it("picks whichever mode is actually smaller", async () => {
@@ -166,27 +189,39 @@ describe("size", () => {
     });
 });
 
-describe("rejects malformed input", () => {
+describe("rejects a file that is not a sketch at all", () => {
     it("rejects an empty file", async () => {
-        expect(await parseSketch(new Uint8Array(0))).toBeNull();
+        expect(await parseSketch(new Uint8Array(0))).toEqual(
+            rejected("not-a-sketch")
+        );
     });
 
-    it("rejects a file shorter than the header", async () => {
-        expect(await parseSketch(Uint8Array.of(0x53, 0x4b, 0x50))).toBeNull();
+    it("rejects a file too short to hold the magic bytes", async () => {
+        expect(await parseSketch(Uint8Array.of(0x53, 0x4b, 0x50))).toEqual(
+            rejected("not-a-sketch")
+        );
     });
 
     it("rejects the wrong magic bytes", async () => {
         const file = await serializeSketch(artworkSketch(4));
         file[0] = 0x00;
 
-        expect(await parseSketch(file)).toBeNull();
+        expect(await parseSketch(file)).toEqual(rejected("not-a-sketch"));
     });
 
+    it("rejects a file of another kind, such as a PNG", async () => {
+        const png = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+
+        expect(await parseSketch(png)).toEqual(rejected("not-a-sketch"));
+    });
+});
+
+describe("rejects a sketch in a format this version does not know", () => {
     it("rejects an unknown payload mode", async () => {
         const file = await serializeSketch(artworkSketch(4));
         file[5] = 9;
 
-        expect(await parseSketch(file)).toBeNull();
+        expect(await parseSketch(file)).toEqual(rejected("unsupported"));
     });
 
     it.each([0, MAX_GRID_SIZE + 1, 255])(
@@ -195,21 +230,31 @@ describe("rejects malformed input", () => {
             const file = await serializeSketch(artworkSketch(4));
             file[4] = gridSize;
 
-            expect(await parseSketch(file)).toBeNull();
+            expect(await parseSketch(file)).toEqual(rejected("unsupported"));
         }
     );
+});
+
+describe("rejects a damaged sketch", () => {
+    it("rejects a file cut off inside the header", async () => {
+        expect(await parseSketch(Uint8Array.of(...MAGIC, 4))).toEqual(
+            rejected("damaged")
+        );
+    });
 
     it("rejects a truncated body", async () => {
         const file = await serializeSketch(artworkSketch(16));
 
-        expect(await parseSketch(file.subarray(0, file.length - 4) as Bytes)).toBeNull();
+        expect(
+            await parseSketch(file.subarray(0, file.length - 4) as Bytes)
+        ).toEqual(rejected("damaged"));
     });
 
     it("rejects a corrupted body", async () => {
         const file = await serializeSketch(artworkSketch(16));
         file[file.length - 3] ^= 0xff;
 
-        expect(await parseSketch(file)).toBeNull();
+        expect(await parseSketch(file)).toEqual(rejected("damaged"));
     });
 
     it("rejects a body that is not deflate data at all", async () => {
@@ -219,13 +264,13 @@ describe("rejects malformed input", () => {
         file[5] = RGB_MODE;
         file.set([1, 2, 3, 4, 5, 6], HEADER_SIZE);
 
-        expect(await parseSketch(file)).toBeNull();
+        expect(await parseSketch(file)).toEqual(rejected("damaged"));
     });
 
     it("rejects an RGB payload whose length does not match the grid", async () => {
         expect(
             await parseSketch(await fileWith(new Uint8Array(27), { gridSize: 4 }))
-        ).toBeNull();
+        ).toEqual(rejected("damaged"));
     });
 
     it("rejects a palette payload of the wrong length", async () => {
@@ -235,7 +280,7 @@ describe("rejects malformed input", () => {
             await parseSketch(
                 await fileWith(payload, { gridSize: 4, mode: PALETTE_MODE })
             )
-        ).toBeNull();
+        ).toEqual(rejected("damaged"));
     });
 
     it("rejects a palette payload with no bytes at all", async () => {
@@ -246,7 +291,7 @@ describe("rejects malformed input", () => {
                     mode: PALETTE_MODE,
                 })
             )
-        ).toBeNull();
+        ).toEqual(rejected("damaged"));
     });
 
     it("rejects an empty palette", async () => {
@@ -254,7 +299,7 @@ describe("rejects malformed input", () => {
             await parseSketch(
                 await fileWith(Uint8Array.of(0), { gridSize: 4, mode: PALETTE_MODE })
             )
-        ).toBeNull();
+        ).toEqual(rejected("damaged"));
     });
 
     it("rejects an index pointing past the end of the palette", async () => {
@@ -267,7 +312,7 @@ describe("rejects malformed input", () => {
             await parseSketch(
                 await fileWith(payload, { gridSize: 2, mode: PALETTE_MODE })
             )
-        ).toBeNull();
+        ).toEqual(rejected("damaged"));
     });
 
     it("rejects a one-color palette payload that carries no index bits", async () => {
@@ -284,7 +329,7 @@ describe("rejects malformed input", () => {
                     mode: PALETTE_MODE,
                 })
             )
-        ).toBeNull();
+        ).toEqual(rejected("damaged"));
     });
 
     it("does not allocate on a declared grid size a tiny body cannot fill", async () => {
@@ -293,6 +338,6 @@ describe("rejects malformed input", () => {
             mode: RGB_MODE,
         });
 
-        expect(await parseSketch(file)).toBeNull();
+        expect(await parseSketch(file)).toEqual(rejected("damaged"));
     });
 });

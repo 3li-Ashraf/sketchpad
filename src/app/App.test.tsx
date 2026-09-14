@@ -18,6 +18,14 @@ const toolbar = () => screen.getByRole("complementary", { name: "Settings" });
 
 const canvas = () => screen.getByTestId("canvas-surface");
 
+/** Presses the grid size slider over a drawing, which opens the resize dialog. */
+const openResizeDialog = () => {
+    paintStroke(0);
+    fireEvent.pointerDown(screen.getByRole("slider", { name: "Grid size" }), {
+        button: 0,
+    });
+};
+
 describe("shell", () => {
     it("renders the title, toolbar and canvas", () => {
         render(<App />);
@@ -76,6 +84,18 @@ describe("collapsible toolbar", () => {
 
         await userEvent.click(toggle());
         fireEvent.pointerDown(screen.getByRole("button", { name: "Pen" }));
+
+        expect(toolbar()).toHaveClass("flex");
+    });
+
+    it("stays open when a pointer goes down inside a dialog it opened", async () => {
+        // The dialog is portalled out of the toolbar, so this is the press the
+        // outside-press check would otherwise mistake for one outside it.
+        render(<App />);
+
+        await userEvent.click(toggle());
+        openResizeDialog();
+        fireEvent.pointerDown(screen.getByRole("button", { name: "Cancel" }));
 
         expect(toolbar()).toHaveClass("flex");
     });
@@ -157,6 +177,15 @@ describe("keyboard shortcuts", () => {
         paintStroke(0);
 
         await userEvent.keyboard("{Control>}a{/Control}");
+
+        expect(store().colors[0]).toBe(DEFAULT_PEN_COLOR);
+    });
+
+    it("undoes nothing while a dialog is open", async () => {
+        render(<App />);
+        openResizeDialog();
+
+        await userEvent.keyboard("{Control>}z{/Control}");
 
         expect(store().colors[0]).toBe(DEFAULT_PEN_COLOR);
     });

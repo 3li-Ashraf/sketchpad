@@ -17,10 +17,12 @@ export default defineConfig({
                 // are content-hashed, so the vendor chunk's name — and the
                 // cached copy of it — stays put across an app-only change.
                 //
-                // `advancedChunks` rather than a `manualChunks` map: Vite 8
-                // bundles with Rolldown, where `manualChunks` accepts only a
-                // function and this is the declarative form.
-                advancedChunks: {
+                // `codeSplitting` rather than a `manualChunks` map: Vite 8 bundles
+                // with Rolldown, where `manualChunks` accepts only a function and
+                // this is the declarative form. It replaces the older
+                // `advancedChunks` option, which took the same shape but is now
+                // deprecated.
+                codeSplitting: {
                     groups: [{ name: "vendor", test: /node_modules/ }],
                 },
             },

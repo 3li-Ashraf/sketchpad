@@ -7,12 +7,10 @@
 
 import { BiSolidEraser } from "react-icons/bi";
 import { FaRedo, FaUndo } from "react-icons/fa";
-import { FaWandMagicSparkles } from "react-icons/fa6";
-import { FiDownload, FiUpload } from "react-icons/fi";
-import { GrClearOption } from "react-icons/gr";
+import { FiDownload, FiImage, FiTrash2, FiUpload } from "react-icons/fi";
 import { HiPencil } from "react-icons/hi2";
 import { IoMdColorFill } from "react-icons/io";
-import { MdCamera, MdDensityLarge, MdGridOn } from "react-icons/md";
+import { TbBorderAll, TbFlipHorizontal, TbFlipVertical } from "react-icons/tb";
 import { SKETCH_FILE_EXTENSION } from "../../io/sketchFile";
 import {
     selectCanRedo,
@@ -24,6 +22,7 @@ import {
     EDITOR_PANEL_HEIGHT,
     TOOLBAR_PANEL_HEIGHT,
 } from "../common/panelSize";
+import { ColorfulPenIcon } from "./ColorfulPenIcon";
 import { ColorPicker } from "./ColorPicker";
 import { GridSizeSlider } from "./GridSizeSlider";
 import { ToolbarButton } from "./ToolbarButton";
@@ -88,7 +87,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
                     isActive={tool === "colorfulPen"}
                     onClick={() => setTool("colorfulPen")}
                 >
-                    <FaWandMagicSparkles />
+                    <ColorfulPenIcon />
                 </ToolbarButton>
 
                 <ToolbarButton
@@ -100,7 +99,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
                 </ToolbarButton>
 
                 <ToolbarButton label="Clear Grid" onClick={clearGrid}>
-                    <GrClearOption />
+                    <FiTrash2 />
                 </ToolbarButton>
 
                 <ToolbarButton
@@ -116,11 +115,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
                     isActive={showGridLines}
                     onClick={toggleGridLines}
                 >
-                    <MdGridOn />
+                    <TbBorderAll />
                 </ToolbarButton>
 
                 <ToolbarButton label="Screenshot" onClick={exportPng}>
-                    <MdCamera />
+                    <FiImage />
                 </ToolbarButton>
 
                 <ToolbarButton
@@ -128,7 +127,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
                     isActive={mirrorX}
                     onClick={toggleMirrorX}
                 >
-                    <MdDensityLarge />
+                    <TbFlipHorizontal />
                 </ToolbarButton>
 
                 <ToolbarButton
@@ -136,7 +135,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
                     isActive={mirrorY}
                     onClick={toggleMirrorY}
                 >
-                    <MdDensityLarge className="rotate-90" />
+                    <TbFlipVertical />
                 </ToolbarButton>
 
                 <ToolbarButton label="Undo" isDisabled={!canUndo} onClick={undo}>

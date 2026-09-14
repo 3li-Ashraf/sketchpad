@@ -78,7 +78,7 @@ one component that uses it instead of in a shared `hooks/` bucket:
 ```
 ui/
   canvas/   Canvas, CanvasCell, usePaintGestures
-  toolbar/  Toolbar, ToolbarButton, ColorPicker, GridSizeSlider, useSketchFiles
+  toolbar/  Toolbar, ToolbarButton, ColorPicker, ColorfulPenIcon, GridSizeSlider, useSketchFiles
   common/   Tooltip, and the panel sizes the canvas and toolbar must agree on
 ```
 
@@ -136,7 +136,7 @@ cannot be read at all — `arrayBuffer` rejects for a file moved or deleted sinc
 it was picked, which the browser only discovers after the picker has closed.
 
 **The bundle is split app-from-vendor.** React and the icon set are most of its
-weight and change only on a dependency upgrade, so `advancedChunks` in
+weight and change only on a dependency upgrade, so `codeSplitting` in
 `vite.config.ts` puts them in their own content-hashed chunk: a deploy that
 touches only app code invalidates about 6 kB gzipped rather than the whole 69 kB.
 
@@ -175,7 +175,7 @@ Choosing between them takes two steps. Palette mode is **eligible** only when th
 
 Color count alone does not decide it, because deflate has already removed the redundancy by the time the two are compared. On flat areas a run of identical cells collapses to nearly nothing in either layout and the winner comes down to a handful of bytes. Palette mode pulls clearly ahead — 35–55% in measurements — on variety without repetition: a few colors scattered irregularly, where RGB mode has no repeated sequence for the compressor to point at. Blobby artwork with more than about sixteen colors goes the other way and RGB wins, which is why the choice is measured rather than guessed.
 
-Cells are row-major in both modes. A 64×64 sketch lands at roughly 600 bytes to 1 kB for ordinary artwork, a couple of dozen bytes for a blank canvas, and about 8 kB in the worst case where every cell differs — against roughly 40 kB for the same grid stored as JSON hex strings.
+Cells are row-major in both modes. A 64×64 sketch lands at roughly 600 bytes to 1 kB for ordinary artwork, a couple of dozen bytes for a blank canvas, and up to about 12 kB in the worst case — every cell an unrelated, incompressible color, as a canvas fully covered by the colorful pen tends to produce — against roughly 40 kB for the same grid stored as JSON hex strings.
 
 Loading treats the file as hostile. The magic bytes are checked; the grid size is range-checked **before** it is used to size anything; each decoder requires the payload length to match the cell count exactly; and palette indices are checked against the palette length, since a bit width can encode indices past its end. Corruption is caught by the zlib checksum, which the format gets for six bytes by using zlib-wrapped deflate rather than `deflate-raw`. Anything that fails returns null and the app reports it rather than throwing.
 

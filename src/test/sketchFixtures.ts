@@ -52,9 +52,12 @@ export const artworkSketch = (gridSize: number, paletteSize = 6): Sketch => {
 };
 
 /**
- * Every cell a different color — the worst case for the save format, and past
- * 255 colors the case that forces RGB mode. It is also roughly what the colorful
- * pen produces.
+ * Every cell a different color, which past 255 colors is what forces RGB mode.
+ * The sequence is a deterministic ramp rather than the independent random color
+ * `randomHexColor` gives each cell, so it compresses noticeably better than a
+ * canvas the colorful pen actually fills — real per-cell randomness would make
+ * the size assertions in `sketchFile.test` flaky, which matters more here than
+ * matching that tool's output byte for byte.
  */
 export const rainbowSketch = (gridSize: number): Sketch => ({
     gridSize,

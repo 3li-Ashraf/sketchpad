@@ -66,6 +66,7 @@
     border-radius: var(--radius-md);
     background-color: var(--color-surface);
     color: var(--color-accent);
+    cursor: pointer;
     transition-property: color, background-color;
     transition-timing-function: var(--default-transition-timing-function);
     transition-duration: 75ms;
@@ -81,6 +82,7 @@
 
   .toolbar-control:disabled {
     opacity: 0.4;
+    cursor: default;
   }
 
   /* The grid size slider: the browser's own range control, restyled to sit with

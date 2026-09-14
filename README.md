@@ -165,7 +165,7 @@ touches only app code invalidates about 8 kB gzipped rather than the whole 71 kB
 
 ## Styling
 
-Tailwind is configured from CSS. `@theme` in `src/styles/index.css` is the single source of the palette, fonts and animations, and Tailwind v4 discovers source files itself, so there is no `tailwind.config.js` and no `content` list to keep in step.
+Tailwind is configured from CSS. `@theme` in `src/styles/index.css` is the single source of the palette, fonts and animations, and the `source("..")` on its `@import` limits the files Tailwind scans for class names to `src/`, so there is no `tailwind.config.js` and no `content` list to keep in step. Without that limit Tailwind also reads files outside `src/` that git does not ignore, this README among them, and words in it that happen to be utility names, such as "outline" or "transition", become CSS rules that no element uses.
 
 The two fonts those tokens name are self-hosted from `@fontsource`, imported in `src/main.tsx` and bundled by Vite, so the app makes no third-party requests. Only the faces in use are imported — Roboto 400 and 500, Press Start 2P 400 — and only the latin subset of each, since every string the app renders is fixed English.
 

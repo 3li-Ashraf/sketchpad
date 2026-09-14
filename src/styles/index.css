@@ -1,10 +1,17 @@
-@import "tailwindcss";
+/* Class names are looked for only under `src/`, the path being relative to this
+   file. Left to find sources on its own, Tailwind also reads files outside
+   `src/` that git does not ignore, the README among them, and turns ordinary
+   words there that happen to be utility names ("outline", "transition") into
+   CSS that no element uses. Words in comments and test names under `src/`
+   still count. `index.html` carries no classes, so nothing is lost by leaving
+   it out. */
+@import "tailwindcss" source("..");
 
 /* Single source of truth for the design tokens. Tailwind v4 reads them straight
    from CSS, so `bg-surface`, `text-accent`, `font-pixeled` and `animate-spin-slow`
    are generated from these declarations and there is no JS config to keep in
-   step. Source files are discovered automatically, so there is no `content` list
-   either. */
+   step. Which files are scanned is set on the import above, so there is no
+   `content` list either. */
 @theme {
   --color-surface: #181818;
   --color-accent: #3ea6ff;

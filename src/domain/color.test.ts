@@ -44,7 +44,7 @@ describe("hexToRgb", () => {
     // relies on this. A `.skpd` file cannot carry hex text of either case: it
     // holds raw RGB bytes, and every color out of the decoder is built by
     // `rgbToHex`.
-    it("reads lowercase digits too, as a loaded file may carry them", () => {
+    it("reads lowercase digits too, though the app always hands it uppercase", () => {
         expect(hexToRgb("#3ea6ff")).toEqual([62, 166, 255]);
     });
 });

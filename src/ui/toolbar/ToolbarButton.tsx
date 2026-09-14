@@ -11,9 +11,9 @@ interface ToolbarButtonProps {
     onClick: () => void;
     /**
      * Set for tools and toggles, which stay visibly pressed; omit for one-shot
-     * actions, which flash on press through the `active:` variant instead.
-     * Omitting it also drops `aria-pressed`, so a one-shot action is not
-     * announced as a toggle.
+     * actions, which flash on press through `button.toolbar-control:active`
+     * instead. Omitting it also drops `aria-pressed`, so a one-shot action is
+     * not announced as a toggle.
      */
     isActive?: boolean;
     isDisabled?: boolean;

@@ -212,7 +212,15 @@
   }
 
   .tooltip::after {
+    /* Generated text is read out like any other: browsers put it in the
+       accessibility tree, and `opacity: 0` does not take it out. Every control a
+       tooltip labels already carries the same text as its `aria-label`, so the
+       second declaration gives the label empty alternative text and a screen
+       reader announces the control once. The order matters: a browser that
+       predates the `/` syntax drops that declaration whole and falls back to the
+       first, which still draws the label. */
     content: attr(data-tooltip);
+    content: attr(data-tooltip) / "";
     bottom: calc(100% + var(--spacing) * 2.5);
     padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2);
     border-radius: var(--radius-sm);

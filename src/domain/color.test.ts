@@ -46,6 +46,15 @@ describe("isHexColor", () => {
     it.each(NOT_COLORS)("refuses %j", (value) => {
         expect(isHexColor(value)).toBe(false);
     });
+
+    // A pattern test turns its argument into a string first, so without a
+    // type check these would pass as the colors they spell.
+    it.each<[string, unknown]>([
+        ["a String object", new String("#3EA6FF")],
+        ["an object that spells a color", { toString: () => "#3EA6FF" }],
+    ])("refuses %s", (_, value) => {
+        expect(isHexColor(value)).toBe(false);
+    });
 });
 
 describe("randomHexColor", () => {

@@ -230,7 +230,6 @@ export const decodeAutosave = (value: unknown): Workspace | null => {
         !redoStack ||
         !symmetry ||
         !isDrawingTool(tool) ||
-        typeof penColor !== "string" ||
         !isHexColor(penColor) ||
         typeof showGridLines !== "boolean"
     ) {

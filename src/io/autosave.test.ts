@@ -220,6 +220,16 @@ describe("the autosave record", () => {
             "a color that is not one",
             withDocument({ colors: ["red", ...base.document.colors.slice(1)] }),
         ],
+        [
+            // Storage keeps a String object as one, and it spells a color.
+            "a color that is not a string",
+            withDocument({
+                colors: [
+                    new String("#FFFFFF"),
+                    ...base.document.colors.slice(1),
+                ],
+            }),
+        ],
         ["an unsupported grid size", withDocument({ gridSize: 65 })],
         ["a grid size that is not a number", withDocument({ gridSize: "2" })],
         ["colors that are not a list", withDocument({ colors: "#FFFFFF" })],

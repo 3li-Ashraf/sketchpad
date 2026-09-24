@@ -10,9 +10,13 @@
 const CANONICAL_HEX_COLOR = /^#[0-9A-F]{6}$/;
 const HEX_COLOR = /^#[0-9A-F]{6}$/i;
 
-/** Whether a value is a color in the app's form: `#` and six uppercase digits. */
-export const isHexColor = (value: string): boolean =>
-    CANONICAL_HEX_COLOR.test(value);
+/**
+ * Whether a value is a color in the app's form: `#` and six uppercase digits.
+ * The type is checked first because a pattern test converts its argument to a
+ * string, which would pass a `String` object read back from storage.
+ */
+export const isHexColor = (value: unknown): value is string =>
+    typeof value === "string" && CANONICAL_HEX_COLOR.test(value);
 
 /**
  * Reads `#rrggbb` in either case into the app's form, or null for anything

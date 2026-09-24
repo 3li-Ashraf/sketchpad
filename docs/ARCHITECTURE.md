@@ -97,14 +97,14 @@ Actions live on one `actions` object that is created once, so
 Each kind of value has one rule, defined once in `domain/`, and every boundary
 where that kind of value arrives checks it:
 
-| Rule                                                      | Checked where                                                                                      |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `parseHexColor` / `isHexColor`: `#` and six hex digits    | `setPenColor` (from the color input), and the brush and fill colors in `paintCells` and `fillFrom` |
-| `isCellIndex`: a whole number inside the grid             | `paintCells`, `fillFrom` and `collectFillRegion`                                                   |
-| A finite grid size, clamped to 1..64                      | `resizeDocument` (from the slider)                                                                 |
-| `isValidSketch`: supported size, one valid color per cell | `openDocument` (loading), `encodeSketch` (saving) and `renderSketchPng` (exporting)                |
-| `decodeAutosave`: every part of an autosaved workspace    | `readAutosave`, when the page opens                                                                |
-| The `.skpd` format's own checks                           | `decodeSketch` and `readSketchFile`; see [the format](#the-skpd-format)                            |
+| Rule                                                               | Checked where                                                                                      |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `parseHexColor` / `isHexColor`: a string of `#` and six hex digits | `setPenColor` (from the color input), and the brush and fill colors in `paintCells` and `fillFrom` |
+| `isCellIndex`: a whole number inside the grid                      | `paintCells`, `fillFrom` and `collectFillRegion`                                                   |
+| A finite grid size, clamped to 1..64                               | `resizeDocument` (from the slider)                                                                 |
+| `isValidSketch`: supported size, one valid color per cell          | `openDocument` (loading), `encodeSketch` (saving) and `renderSketchPng` (exporting)                |
+| `decodeAutosave`: every part of an autosaved workspace             | `readAutosave`, when the page opens                                                                |
+| The `.skpd` format's own checks                                    | `decodeSketch` and `readSketchFile`; see [the format](#the-skpd-format)                            |
 
 **Who hears about it depends on who can cause it.**
 
@@ -129,7 +129,10 @@ from code; read back from storage, they are (`isDrawingTool`).
 
 The native color input reports lowercase, so `parseHexColor` uppercases what it
 accepts, and decoded files are built by `rgbToHex`. Every color the app holds is
-therefore uppercase `#RRGGBB`, and colors compare with `===`.
+therefore uppercase `#RRGGBB`, and colors compare with `===`. `isHexColor`
+checks the type before the pattern, because a pattern test converts its
+argument to a string: a `String` object, which storage keeps as one, would
+otherwise pass as the color it spells and then compare unequal to it.
 
 ## Logging and errors
 

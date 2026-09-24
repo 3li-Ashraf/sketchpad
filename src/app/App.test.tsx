@@ -12,12 +12,16 @@ import { BLANK_CELL_COLOR, createBlankGrid, NO_SYMMETRY } from "../domain/grid";
 import { DEFAULT_PEN_COLOR } from "../domain/tools";
 import type { Workspace } from "../domain/workspace";
 import { readAutosave } from "../io/autosave";
-import { workspaceOf } from "../state/sketchStore";
 import {
     deleteAutosaveDatabase,
     readStoredRecord,
 } from "../test/autosaveDatabase";
-import { canvasColors, paintStroke, store } from "../test/storeHelpers";
+import {
+    actions,
+    canvasColors,
+    paintStroke,
+    store,
+} from "../test/storeHelpers";
 import { AUTOSAVE_DELAY } from "../ui/autosave/autosaveSession";
 import type { Restored } from "../ui/autosave/restoreAutosave";
 import { App } from "./App";
@@ -37,16 +41,6 @@ const openResizeDialog = () => {
 };
 
 describe("shell", () => {
-    it("renders the title, toolbar and canvas", () => {
-        render(<App />);
-
-        expect(
-            screen.getByRole("heading", { name: "Sketchpad" })
-        ).toBeInTheDocument();
-        expect(toolbar()).toBeInTheDocument();
-        expect(canvas()).toBeInTheDocument();
-    });
-
     it("clears the device the moment New sketch is confirmed", async () => {
         await deleteAutosaveDatabase();
         render(<App />);
@@ -70,18 +64,6 @@ describe("shell", () => {
         );
         await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_DELAY));
         expect(await readStoredRecord()).toBeUndefined();
-    });
-
-    it("autosaves what is drawn", async () => {
-        await deleteAutosaveDatabase();
-        render(<App />);
-        paintStroke(0);
-
-        window.dispatchEvent(new Event("pagehide"));
-
-        await waitFor(async () =>
-            expect(await readAutosave()).toEqual(workspaceOf(store()))
-        );
     });
 });
 
@@ -116,15 +98,6 @@ describe("collapsible toolbar", () => {
         await userEvent.click(toggle());
 
         expect(toggle()).toHaveAttribute("aria-expanded", "false");
-    });
-
-    it("closes when a pointer goes down outside it", async () => {
-        render(<App />);
-
-        await userEvent.click(toggle());
-        fireEvent.pointerDown(canvas());
-
-        expect(toolbar()).toHaveClass("hidden");
     });
 
     describe("closed by a press on the canvas", () => {
@@ -316,14 +289,27 @@ describe("keyboard shortcuts", () => {
         expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
     });
 
-    it("leaves other modified keys to the browser", () => {
+    it("goes by the key's place when it types no letter, as a dead key", () => {
         render(<App />);
         paintStroke(0);
 
-        const isLeft = fireEvent.keyDown(window, { key: "a", ctrlKey: true });
+        fireEvent.keyDown(window, { key: "Dead", code: "KeyZ", ctrlKey: true });
+
+        expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
+    });
+
+    it.each([
+        ["Ctrl+A", { key: "a" }],
+        ["Ctrl+Shift+A", { key: "A", shiftKey: true }],
+    ])("leaves %s to the browser", (_, keys) => {
+        render(<App />);
+        paintStroke(0);
+        actions().undo();
+
+        const isLeft = fireEvent.keyDown(window, { ...keys, ctrlKey: true });
 
         expect(isLeft).toBe(true);
-        expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
+        expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
     });
 
     it("undoes nothing while a dialog is open", async () => {

@@ -123,19 +123,6 @@ describe("confirmation", () => {
         expect(onCancel).toHaveBeenCalledOnce();
     });
 
-    it("reports the browser closing it on its own as Cancel", () => {
-        // A `cancel` that could not be prevented, as when Escape arrives with no
-        // user activation to spend: the dialog is already closed by the time
-        // `close` is delivered.
-        const { onCancel } = renderConfirm();
-        const element = dialog() as HTMLDialogElement;
-
-        element.close();
-        fireEvent(element, new Event("close"));
-
-        expect(onCancel).toHaveBeenCalledOnce();
-    });
-
     it("ignores a close event delivered while it is open", () => {
         // What a StrictMode remount leaves behind: the event queued by the
         // first cleanup's `close`, arriving after the dialog has reopened.

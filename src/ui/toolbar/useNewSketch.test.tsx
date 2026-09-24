@@ -149,6 +149,20 @@ describe("New sketch", () => {
             expect(isCanvasBlank()).toBe(true);
         });
 
+        it("asks again next time when Don't ask again was left unticked", async () => {
+            renderToolbar();
+            paintStroke(0);
+            await userEvent.click(button("New sketch"));
+            await userEvent.click(button("Start new sketch"));
+
+            paintStroke(1);
+            await userEvent.click(button("New sketch"));
+
+            expect(await findDialog()).toHaveAccessibleName(
+                NEW_SKETCH_DIALOG_TITLE
+            );
+        });
+
         it("asks independently of the resize and replace questions", async () => {
             actions().stopAskingBeforeResize();
             actions().stopAskingBeforeReplace();

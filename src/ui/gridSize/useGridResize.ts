@@ -20,11 +20,12 @@ export const RESIZE_WARNING =
     "Changing the size will erase your drawing and its undo history. This can't be undone.";
 
 /**
- * The drawing as it stood when the slider was unlocked, held by identity. Edits
- * replace these arrays rather than mutate them, so the approval lapses on its
- * own at the next stroke, fill or undo.
+ * The colors as they stood when the slider was unlocked, held by identity.
+ * Every edit to the drawing or its history replaces them, a stroke from its
+ * first painted cell, so the approval lapses on its own at the next stroke,
+ * fill, clear, rotation, undo or redo.
  */
-type Approval = Pick<SketchDocument, "colors" | "undoStack" | "redoStack">;
+type Approval = SketchDocument["colors"];
 
 interface GridResize {
     gridSize: number;
@@ -44,11 +45,7 @@ interface GridResize {
 const isApproved = (
     { document }: SketchStore,
     approval: Approval | null
-): boolean =>
-    approval !== null &&
-    approval.colors === document.colors &&
-    approval.undoStack === document.undoStack &&
-    approval.redoStack === document.redoStack;
+): boolean => approval === document.colors;
 
 // Cheapest first: the grid scan runs only when the flags have not settled it.
 const isLockedFor = (state: SketchStore, approval: Approval | null): boolean =>
@@ -102,9 +99,7 @@ export const useGridResize = (): GridResize => {
               onConfirm: (dontAskAgain) => {
                   if (dontAskAgain) stopAskingBeforeResize();
 
-                  const { colors, undoStack, redoStack } =
-                      useSketchStore.getState().document;
-                  setApproval({ colors, undoStack, redoStack });
+                  setApproval(useSketchStore.getState().document.colors);
                   setIsAsking(false);
               },
               onCancel: () => setIsAsking(false),

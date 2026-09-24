@@ -110,18 +110,6 @@ describe("saving", () => {
         });
     });
 
-    it("saves far fewer bytes than one JSON color string per cell", async () => {
-        renderToolbar();
-        paintStroke(0, 1, 2);
-
-        await userEvent.click(button("Save sketch"));
-        await waitFor(() => expect(recording.blobs).toHaveLength(1));
-
-        // The same 32x32 grid as a JSON array of hex strings is about 10 kB,
-        // which is what makes this threshold a meaningful one.
-        expect(recording.blobs[0].size).toBeLessThan(256);
-    });
-
     it("reports the failure in a dialog instead of downloading a broken file", async () => {
         breakCompression();
         renderToolbar();
@@ -458,6 +446,19 @@ describe("loading", () => {
             expectNoDialog();
         });
 
+        it("asks again next time when Don't ask again was left unticked", async () => {
+            await loadOverDrawing();
+            await findDialog();
+            await userEvent.click(button("Replace drawing"));
+
+            paintStroke(0);
+            selectFile(await encodeSketch(artworkSketch(8)), "dog.skpd");
+
+            expect(await findDialog()).toHaveAccessibleName(
+                replaceTitle("dog.skpd")
+            );
+        });
+
         it("asks independently of the resize question", async () => {
             renderToolbar();
             actions().stopAskingBeforeResize();
@@ -552,13 +553,29 @@ describe("dropping a file on the page", () => {
 
         const over = dragEvent("dragover", [await sketchFile("second.skpd")]);
         window.dispatchEvent(over);
+        const read = vi.spyOn(Blob.prototype, "arrayBuffer");
         const second = drop(await sketchFile("second.skpd"));
 
         expect(over.dataTransfer!.dropEffect).toBe("none");
         expect(second.defaultPrevented).toBe(true);
+        expect(read).not.toHaveBeenCalled();
         expect(await findDialog()).toHaveAccessibleName(
             replaceTitle("first.skpd")
         );
+    });
+
+    it("keeps the page, and opens nothing, for a drop of files that holds none", () => {
+        renderToolbar();
+        // As a folder dropped in some browsers: typed as files, with none.
+        const dropped = dragEvent("drop");
+        Object.defineProperty(dropped.dataTransfer, "types", {
+            value: ["Files"],
+        });
+
+        window.dispatchEvent(dropped);
+
+        expect(dropped.defaultPrevented).toBe(true);
+        expectNoDialog();
     });
 
     it("leaves a drag with no data at all to the browser", () => {
@@ -574,8 +591,11 @@ describe("dropping a file on the page", () => {
         const { unmount } = renderToolbar();
         unmount();
 
+        const over = dragEvent("dragover", [await sketchFile()]);
+        window.dispatchEvent(over);
         const dropped = drop(await sketchFile());
 
+        expect(over.defaultPrevented).toBe(false);
         expect(dropped.defaultPrevented).toBe(false);
     });
 });

@@ -106,7 +106,7 @@ export const useSketchFiles = (): SketchFiles => {
             });
     }, []);
 
-    const openSketch = useCallback(() => fileInputRef.current?.click(), []);
+    const openSketch = useCallback(() => fileInputRef.current!.click(), []);
 
     // Never rejects: `readSketchFile` returns every failure as a reason.
     const loadFile = useCallback(

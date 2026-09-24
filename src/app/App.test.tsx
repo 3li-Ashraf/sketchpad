@@ -17,7 +17,7 @@ import {
 import { DEFAULT_PEN_COLOR } from "../domain/tools";
 import type { Workspace } from "../domain/workspace";
 import { readAutosave } from "../io/autosave";
-import { selectWorkspace } from "../state/sketchStore";
+import { workspaceOf } from "../state/sketchStore";
 import { deleteAutosaveDatabase } from "../test/autosaveDatabase";
 import { canvasColors, paintStroke, store } from "../test/storeHelpers";
 import type { Restored } from "../ui/files/autosave";
@@ -83,7 +83,7 @@ describe("shell", () => {
         window.dispatchEvent(new Event("pagehide"));
 
         await waitFor(async () =>
-            expect(await readAutosave()).toEqual(selectWorkspace(store()))
+            expect(await readAutosave()).toEqual(workspaceOf(store()))
         );
     });
 });

@@ -24,7 +24,7 @@ import {
     writeAutosave,
 } from "../../io/autosave";
 import { decodeSketch, encodeSketch } from "../../io/sketchFile";
-import { selectSketch, selectWorkspace } from "../../state/sketchStore";
+import { sketchOf, workspaceOf } from "../../state/sketchStore";
 import { deleteAutosaveDatabase } from "../../test/autosaveDatabase";
 import { button } from "../../test/queries";
 import { actions, paintStroke, store } from "../../test/storeHelpers";
@@ -52,7 +52,7 @@ describe("downloads in a real browser", () => {
         expect(fileName).toBe("sketch.skpd");
         expect(await decodeSketch(bytesOf(base64))).toEqual({
             ok: true,
-            sketch: selectSketch(store()),
+            sketch: sketchOf(store()),
         });
     });
 
@@ -111,7 +111,7 @@ describe("autosave in a real browser", () => {
         paintStroke(0, 1, 2);
         actions().undo();
         paintStroke(40);
-        const before = selectWorkspace(store());
+        const before = workspaceOf(store());
 
         // Sooner than the usual delay: leaving the page saves at once.
         window.dispatchEvent(new Event("pagehide"));
@@ -124,7 +124,7 @@ describe("autosave in a real browser", () => {
         actions().setGridSize(16);
         await restoreAutosave();
 
-        expect(selectWorkspace(store())).toEqual(before);
+        expect(workspaceOf(store())).toEqual(before);
     });
 
     it("takes up what another tab saves, through the browser's own channel", async () => {
@@ -132,7 +132,7 @@ describe("autosave in a real browser", () => {
         // own waiting, which would win instead.
         actions().setGridSize(4);
         paintStroke(5);
-        const saved = selectWorkspace(store());
+        const saved = workspaceOf(store());
         await writeAutosave(saved);
         actions().setGridSize(8);
         render(<Autosaving />);
@@ -141,6 +141,6 @@ describe("autosave in a real browser", () => {
 
         otherTab.announce();
 
-        await expect.poll(() => selectWorkspace(store())).toEqual(saved);
+        await expect.poll(() => workspaceOf(store())).toEqual(saved);
     });
 });

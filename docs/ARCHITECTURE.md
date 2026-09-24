@@ -88,9 +88,15 @@ document, the helper hands Zustand back the same state object, and Zustand then
 notifies no subscriber at all.
 
 Actions live on one `actions` object that is created once, so
-`useSketchActions()` never causes a re-render. Derived values are selectors:
-`selectCanUndo`, `selectCanRedo`, `selectHasWorkToLose`, `selectSketch`, and
-`selectWorkspace`, which `restoreWorkspace` puts back (see [Autosave](#autosave)).
+`useSketchActions()` never causes a re-render. Derived values come in two
+kinds, and the name says which:
+
+- **Selectors** (`select…`), safe to pass to `useSketchStore`, return a
+  primitive: `selectCanUndo`, `selectCanRedo` and `selectHasWorkToLose`.
+- **Values built on each call** (`…Of`) are read from `getState()`: `sketchOf`,
+  and `workspaceOf`, which `restoreWorkspace` puts back (see
+  [Autosave](#autosave)). As a selector, a new object every time would never
+  compare equal, and the component would render without end.
 
 ## Validation
 

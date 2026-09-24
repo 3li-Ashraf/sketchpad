@@ -22,7 +22,7 @@ import {
     readAutosave,
     writeAutosave,
 } from "../../io/autosave";
-import { selectWorkspace } from "../../state/sketchStore";
+import { workspaceOf } from "../../state/sketchStore";
 import {
     deleteAutosaveDatabase,
     writeStoredRecord,
@@ -128,7 +128,7 @@ describe("restoreAutosave", () => {
         actions().toggleSymmetry("leftRight");
         actions().setPenColor("#123456");
         paintStroke(0);
-        const before = selectWorkspace(store());
+        const before = workspaceOf(store());
         await writeAutosave(before);
         actions().setGridSize(8);
         actions().setTool("pen");
@@ -138,7 +138,7 @@ describe("restoreAutosave", () => {
             answer: null,
         });
 
-        expect(selectWorkspace(store())).toEqual(before);
+        expect(workspaceOf(store())).toEqual(before);
         expect(store().document.strokeBaseline).toBeNull();
     });
 
@@ -146,7 +146,7 @@ describe("restoreAutosave", () => {
         actions().setGridSize(4);
         actions().setPenColor("#123456");
         paintStroke(0);
-        await writeAutosave(selectWorkspace(store()));
+        await writeAutosave(workspaceOf(store()));
         actions().setGridSize(8);
 
         await restoreAutosave();
@@ -237,7 +237,7 @@ describe("useAutosave", () => {
 
         expect(writes()).toBe(1);
         await vi.mocked(writeAutosave).mock.results[0].value;
-        expect(await saved()).toEqual(selectWorkspace(store()));
+        expect(await saved()).toEqual(workspaceOf(store()));
     });
 
     it("writes once for a burst of changes", async () => {
@@ -280,7 +280,7 @@ describe("useAutosave", () => {
 
         expect(writes()).toBe(1);
         await vi.mocked(writeAutosave).mock.results[0].value;
-        expect(await saved()).toEqual(selectWorkspace(store()));
+        expect(await saved()).toEqual(workspaceOf(store()));
     });
 
     it("saves the drawing as last committed when the page is left mid-stroke", async () => {
@@ -464,7 +464,7 @@ describe("useAutosave when opening could not read the device", () => {
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
 
         expectNoDialog();
-        expect(selectWorkspace(store())).toEqual(EARLIER);
+        expect(workspaceOf(store())).toEqual(EARLIER);
         expect(writes()).toBe(0);
         expect(restored.isKnown).toBe(true);
     });
@@ -482,7 +482,7 @@ describe("useAutosave when opening could not read the device", () => {
 
         expectNoDialog();
         expect(store().document.colors[0]).toBe(DEFAULT_PEN_COLOR);
-        expect(await saved()).toEqual(selectWorkspace(store()));
+        expect(await saved()).toEqual(workspaceOf(store()));
     });
 
     it("puts a late drawing on the canvas when nothing has been drawn", async () => {
@@ -496,7 +496,7 @@ describe("useAutosave when opening could not read the device", () => {
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
 
         expectNoDialog();
-        expect(selectWorkspace(store())).toEqual(EARLIER);
+        expect(workspaceOf(store())).toEqual(EARLIER);
         expect(writes()).toBe(0);
     });
 
@@ -606,7 +606,7 @@ describe("useAutosave when opening could not read the device", () => {
         fireEvent.click(button("Restore saved drawing"));
         await lastRead();
 
-        expect(selectWorkspace(store())).toEqual(later);
+        expect(workspaceOf(store())).toEqual(later);
         expect(writes()).toBe(0);
     });
 });
@@ -622,7 +622,7 @@ describe("useAutosave with other tabs", () => {
         await lastRead();
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
 
-        expect(selectWorkspace(store())).toEqual(EARLIER);
+        expect(workspaceOf(store())).toEqual(EARLIER);
         expect(writes()).toBe(0);
     });
 
@@ -631,7 +631,7 @@ describe("useAutosave with other tabs", () => {
 
         await saveInAnotherTab(EARLIER);
 
-        expect(selectWorkspace(store())).toEqual(EARLIER);
+        expect(workspaceOf(store())).toEqual(EARLIER);
     });
 
     it("tells the other tabs once it has saved", async () => {
@@ -658,7 +658,7 @@ describe("useAutosave with other tabs", () => {
 
         // The later edit wins, and the other tab takes it up in turn.
         expect(readAutosave).not.toHaveBeenCalled();
-        expect(await saved()).toEqual(selectWorkspace(store()));
+        expect(await saved()).toEqual(workspaceOf(store()));
     });
 
     it("keeps what it draws while reading another tab's save", async () => {
@@ -710,7 +710,7 @@ describe("useAutosave with other tabs", () => {
         await vi.waitFor(() => expect(readAutosave).toHaveBeenCalledTimes(2));
         await lastRead();
 
-        expect(selectWorkspace(store())).toEqual(later);
+        expect(workspaceOf(store())).toEqual(later);
     });
 
     it("warns when another tab's save cannot be read", async () => {
@@ -739,7 +739,7 @@ describe("useAutosave with other tabs", () => {
         );
         await lastRead();
 
-        expect(selectWorkspace(store())).toEqual(EARLIER);
+        expect(workspaceOf(store())).toEqual(EARLIER);
     });
 
     it("stops hearing other tabs once it stops", () => {

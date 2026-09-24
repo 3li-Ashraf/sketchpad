@@ -24,9 +24,9 @@ import {
 import { createLogger } from "../../log/logger";
 import {
     selectHasWorkToLose,
-    selectWorkspace,
     type SketchStore,
     useSketchStore,
+    workspaceOf,
 } from "../../state/sketchStore";
 import type { NoticeDialogProps } from "../common/Dialog";
 
@@ -100,11 +100,11 @@ export const restoreAutosave = async (): Promise<Restored> => {
 
 /**
  * Every part of the workspace, to compare by identity, since an edit replaces
- * what it changes. Read through `selectWorkspace`, so a part added there is
+ * what it changes. Read through `workspaceOf`, so a part added there is
  * watched too, and a stroke's paint is no change until the stroke commits.
  */
 const partsOf = (state: SketchStore): unknown[] => {
-    const { document, settings } = selectWorkspace(state);
+    const { document, settings } = workspaceOf(state);
 
     return [...Object.values(document), ...Object.values(settings)];
 };
@@ -203,7 +203,7 @@ const startAutosave = (
         }
 
         isPending = false;
-        writeAutosave(selectWorkspace(useSketchStore.getState())).then(() => {
+        writeAutosave(workspaceOf(useSketchStore.getState())).then(() => {
             isFailing = false;
             if (!isStopped) channel.announce();
         }, fail);

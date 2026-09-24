@@ -340,6 +340,22 @@ describe("pointer painting", () => {
         expect(fireEvent.contextMenu(surface())).toBe(false);
     });
 
+    it("commits the stroke when the canvas goes away mid-drag", () => {
+        // As it does when a crash swaps the app for the error screen. Nothing
+        // would hear the release, and the open stroke would go on refusing
+        // undo, fill, clear and rotate, and holding back the autosave.
+        const { unmount } = render(<Canvas />);
+        press(0, 0);
+        drag(0, 2);
+
+        unmount();
+
+        expect(store().document.strokeBaseline).toBeNull();
+        expect(store().document.undoStack).toHaveLength(1);
+        act(() => actions().undo());
+        expect(isBlank()).toBe(true);
+    });
+
     it("ignores a release from a pointer that is not the one drawing", () => {
         render(<Canvas />);
 

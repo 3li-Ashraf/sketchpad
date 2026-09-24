@@ -167,6 +167,12 @@ export const usePaintGestures = (): PaintGestures => {
         return () => {
             window.removeEventListener("pointerup", handleRelease);
             window.removeEventListener("pointercancel", handleRelease);
+
+            // Nothing will hear this stroke's release now, as when a crash
+            // unmounts the canvas mid-drag, so it commits here. Left open,
+            // it would go on refusing undo and holding back the autosave.
+            const pointerId = activePointerRef.current;
+            if (pointerId !== null) finishStroke(pointerId);
         };
     }, [finishStroke]);
 

@@ -212,6 +212,9 @@ Input is Pointer Events, one path for mouse, touch and pen
 - Release and cancel are heard on `window`, so a stroke still commits when the
   pointer comes up off the canvas. Leaving the canvas mid-drag starts a new
   segment on return, rather than drawing a line across the gap.
+- A stroke also commits when the canvas unmounts mid-drag, as when a crash
+  swaps in the error screen. Nothing would hear its release, and an open
+  stroke refuses undo, fill, clear and rotate, and holds back the autosave.
 - `touch-action: none` on the frame keeps the browser from claiming a finger
   drag as a pan or zoom.
 

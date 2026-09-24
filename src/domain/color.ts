@@ -25,29 +25,6 @@ export const isHexColor = (value: unknown): value is string =>
 export const parseHexColor = (value: string): string | null =>
     HEX_COLOR.test(value) ? value.toUpperCase() : null;
 
-export const randomHexColor = (): string =>
-    `#${Math.floor(Math.random() * 0x1000000)
-        .toString(16)
-        .padStart(6, "0")
-        .toUpperCase()}`;
-
-/**
- * Splits a color into its channels, read from fixed offsets. The color must
- * already be valid; anything else yields `NaN` channels.
- */
-export const hexToRgb = (color: string): [number, number, number] => [
-    parseInt(color.slice(1, 3), 16),
-    parseInt(color.slice(3, 5), 16),
-    parseInt(color.slice(5, 7), 16),
-];
-
-/** Builds an uppercase color from three channel bytes. */
-export const rgbToHex = (red: number, green: number, blue: number): string =>
-    `#${[red, green, blue]
-        .map((channel) => channel.toString(16).padStart(2, "0"))
-        .join("")
-        .toUpperCase()}`;
-
 /** The largest color as a number, `#FFFFFF`. */
 export const MAX_COLOR_NUMBER = 0xffffff;
 
@@ -62,6 +39,27 @@ export const hexToNumber = (color: string): number =>
 export const isColorNumber = (value: number): boolean =>
     Number.isInteger(value) && value >= 0 && value <= MAX_COLOR_NUMBER;
 
-/** The color a number holds; it must pass `isColorNumber`. */
+/**
+ * The color a number holds; it must pass `isColorNumber`. Every color the app
+ * builds is written here, so all of them come out the same: uppercase, and
+ * padded to six digits.
+ */
 export const numberToHex = (value: number): string =>
     `#${value.toString(16).padStart(6, "0").toUpperCase()}`;
+
+export const randomHexColor = (): string =>
+    numberToHex(Math.floor(Math.random() * (MAX_COLOR_NUMBER + 1)));
+
+/**
+ * Splits a color into its channels, read from fixed offsets. The color must
+ * already be valid; anything else yields `NaN` channels.
+ */
+export const hexToRgb = (color: string): [number, number, number] => [
+    parseInt(color.slice(1, 3), 16),
+    parseInt(color.slice(3, 5), 16),
+    parseInt(color.slice(5, 7), 16),
+];
+
+/** Builds a color from three channel bytes, each 0 to 255. */
+export const rgbToHex = (red: number, green: number, blue: number): string =>
+    numberToHex((red << 16) | (green << 8) | blue);

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createBlankGrid } from "../domain/grid";
 import {
@@ -64,15 +64,27 @@ describe("renderSketchPng", () => {
         ]);
     });
 
-    it("sizes the image by grid size times cell size", async () => {
-        const recording = stubCanvas2d();
+    it.each([1, 10])(
+        "sizes the image by grid size times cell size, at %i pixels a cell",
+        async (cellSize) => {
+            const recording = stubCanvas2d();
 
-        await renderSketchPng(blank(4), 10);
+            await renderSketchPng(blank(4), cellSize);
 
-        const [source, output] = recording.canvases;
-        expect([source.width, source.height]).toEqual([4, 4]);
-        expect([output.width, output.height]).toEqual([40, 40]);
-    });
+            const [source, output] = recording.canvases;
+            expect([source.width, source.height]).toEqual([4, 4]);
+            expect([output.width, output.height]).toEqual([
+                4 * cellSize,
+                4 * cellSize,
+            ]);
+            // The stub's own spy, taken by name rather than off the prototype.
+            const getContext = vi.spyOn(
+                HTMLCanvasElement.prototype,
+                "getContext"
+            );
+            expect(getContext.mock.calls).toEqual([["2d"], ["2d"]]);
+        }
+    );
 
     it("defaults to 50 image pixels per cell", async () => {
         const recording = stubCanvas2d();

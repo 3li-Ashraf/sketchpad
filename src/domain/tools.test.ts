@@ -64,21 +64,15 @@ describe("paintsPerCell", () => {
 });
 
 describe("strokeColor", () => {
-    it("paints the pen color for the pen", () => {
-        expect(strokeColor("pen", PEN_COLOR)).toBe(PEN_COLOR);
-    });
-
-    it("paints blank for the eraser, ignoring the pen color", () => {
-        expect(strokeColor("eraser", PEN_COLOR)).toBe(BLANK_CELL_COLOR);
+    it.each<[DrawingTool, string]>([
+        ["pen", PEN_COLOR],
+        ["fill", PEN_COLOR],
+        ["eraser", BLANK_CELL_COLOR],
+    ])("lays down the right color for the %s", (tool, color) => {
+        expect(strokeColor(tool, PEN_COLOR)).toBe(color);
     });
 
     it("draws a fresh random color per call for the colorful pen", () => {
         expect(twoColors("colorfulPen")).toEqual(["#400000", "#C00000"]);
-    });
-
-    it("returns a usable color for every tool", () => {
-        for (const tool of DRAWING_TOOLS) {
-            expect(strokeColor(tool, PEN_COLOR)).toMatch(/^#[0-9A-F]{6}$/);
-        }
     });
 });

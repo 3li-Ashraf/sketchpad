@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { fc } from "../test/property";
 import {
     BLANK_CELL_COLOR,
     clampGridSize,
@@ -183,26 +184,41 @@ describe("forEachMirroredCell", () => {
         expect(mirrored(3, 3, TOP_BOTTOM)).toEqual([3]);
     });
 
-    it("never visits the same cell twice, for any cell of any grid", () => {
-        for (const gridSize of [1, 2, 3, 4, 5]) {
-            for (let index = 0; index < gridSize * gridSize; index++) {
-                const indices = mirrored(index, gridSize, BOTH);
+    // Every cell of every grid up to 8×8, which covers odd and even sizes
+    // and cells on, next to and away from each axis, under each symmetry.
+    it("visits the cell first, then each distinct reflection once", () => {
+        const symmetries = [NO_SYMMETRY, TOP_BOTTOM, LEFT_RIGHT, BOTH];
+        const failures: string[] = [];
 
-                expect(new Set(indices).size).toBe(indices.length);
-                expect(indices).toContain(index);
-                expect(
-                    indices.every((at) => at >= 0 && at < gridSize * gridSize)
-                ).toBe(true);
+        for (let gridSize = 1; gridSize <= 8; gridSize++) {
+            for (let index = 0; index < gridSize * gridSize; index++) {
+                for (const symmetry of symmetries) {
+                    const row = Math.floor(index / gridSize);
+                    const column = index % gridSize;
+                    const rows = new Set([row]);
+                    const columns = new Set([column]);
+                    if (symmetry.topBottom) rows.add(gridSize - 1 - row);
+                    if (symmetry.leftRight) columns.add(gridSize - 1 - column);
+                    const expected = [...rows].flatMap((r) =>
+                        [...columns].map((c) => r * gridSize + c)
+                    );
+
+                    const visited = mirrored(index, gridSize, symmetry);
+
+                    if (
+                        visited[0] !== index ||
+                        visited.length !== expected.length ||
+                        ascending(visited).join() !== ascending(expected).join()
+                    ) {
+                        failures.push(
+                            `${gridSize}×${gridSize} cell ${index} ${JSON.stringify(symmetry)}: ${visited.join()}`
+                        );
+                    }
+                }
             }
         }
-    });
 
-    it("gives every cell of an even grid all four reflections", () => {
-        // An odd grid has a middle row and column; an even one has neither, so
-        // no cell of it lies on an axis of symmetry.
-        for (let index = 0; index < 16; index++) {
-            expect(mirrored(index, 4, BOTH)).toHaveLength(4);
-        }
+        expect(failures).toEqual([]);
     });
 });
 
@@ -220,16 +236,23 @@ describe("rotateClockwise", () => {
         ]);
     });
 
-    it("comes back to where it started after four turns", () => {
-        const colors = Array.from({ length: 16 }, (_, index) => `${index}`);
+    it("moves every cell of any size to (column, last - row)", () => {
+        for (let gridSize = 1; gridSize <= 8; gridSize++) {
+            const last = gridSize - 1;
+            const colors = Array.from(
+                { length: gridSize * gridSize },
+                (_, index) => `${index}`
+            );
+            const expected = new Array<string>(colors.length);
+            for (let row = 0; row < gridSize; row++) {
+                for (let column = 0; column < gridSize; column++) {
+                    expected[column * gridSize + (last - row)] =
+                        colors[row * gridSize + column];
+                }
+            }
 
-        const turns = [colors];
-        for (let turn = 0; turn < 4; turn++) {
-            turns.push(rotateClockwise(turns[turn], 4));
+            expect(rotateClockwise(colors, gridSize)).toEqual(expected);
         }
-
-        expect(turns.slice(1, 4)).not.toContainEqual(colors);
-        expect(turns[4]).toEqual(colors);
     });
 
     it("leaves the colors it was given alone", () => {
@@ -289,6 +312,64 @@ describe("collectFillRegion", () => {
 
         expect(collectFillRegion(colors, MAX_GRID_SIZE, 0)).toHaveLength(
             MAX_GRID_SIZE * MAX_GRID_SIZE
+        );
+    });
+
+    // Checked against a breadth-first search: another way to find the same
+    // region, over grids of two or three colors, where regions have holes,
+    // arms and islands.
+    it("collects exactly the 4-connected region of the start's color", () => {
+        const drawing = fc
+            .record({
+                gridSize: fc.integer({ min: 1, max: 8 }),
+                colorCount: fc.integer({ min: 2, max: 3 }),
+            })
+            .chain(({ gridSize, colorCount }) =>
+                fc.record({
+                    gridSize: fc.constant(gridSize),
+                    colors: fc.array(
+                        fc.constantFrom(
+                            ...["#000000", BLANK_CELL_COLOR, "#FF0000"].slice(
+                                0,
+                                colorCount
+                            )
+                        ),
+                        {
+                            minLength: gridSize * gridSize,
+                            maxLength: gridSize * gridSize,
+                        }
+                    ),
+                    start: fc.nat(gridSize * gridSize - 1),
+                })
+            );
+
+        fc.assert(
+            fc.property(drawing, ({ gridSize, colors, start }) => {
+                const region = new Set([start]);
+                for (const index of region) {
+                    const row = Math.floor(index / gridSize);
+                    const column = index % gridSize;
+                    const neighbors = [
+                        [row - 1, column],
+                        [row + 1, column],
+                        [row, column - 1],
+                        [row, column + 1],
+                    ];
+                    for (const [r, c] of neighbors) {
+                        const neighbor = r * gridSize + c;
+                        const isOnGrid =
+                            r >= 0 && r < gridSize && c >= 0 && c < gridSize;
+                        if (isOnGrid && colors[neighbor] === colors[start]) {
+                            region.add(neighbor);
+                        }
+                    }
+                }
+
+                expect(
+                    ascending(collectFillRegion(colors, gridSize, start))
+                ).toEqual(ascending([...region]));
+            }),
+            { numRuns: 300 }
         );
     });
 });

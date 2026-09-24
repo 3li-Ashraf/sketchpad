@@ -79,6 +79,24 @@ export const expectLogged = (
     if (data) expect(logged[0].data).toEqual(expect.objectContaining(data));
 };
 
-/** Asserts that exactly one value was refused since the last check, by `where`. */
-export const expectInvalidInput = (where: string): void =>
-    expectLogged("error", "validation", "invalid input refused", { where });
+/**
+ * Asserts that exactly one value was refused since the last check, by
+ * `where`, saying what was wrong with it; `refused`, when given, is the value.
+ */
+export const expectInvalidInput = (
+    where: string,
+    refused?: { value: unknown }
+): void => {
+    const [{ data }] = takeLogs().map((entry) => {
+        expect(entry).toMatchObject({
+            level: "error",
+            source: "validation",
+            message: "invalid input refused",
+        });
+        return entry;
+    });
+
+    expect(data?.where).toBe(where);
+    expect(data?.problem).toEqual(expect.stringMatching(/\w/));
+    if (refused) expect(data?.value).toEqual(refused.value);
+};

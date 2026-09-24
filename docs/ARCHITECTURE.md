@@ -13,9 +13,10 @@ src/
   state/     sketchStore, the one Zustand store
   ui/
     canvas/    Canvas, CanvasRow, CanvasCell, useCellColor, usePaintGestures
-    toolbar/   Toolbar, ToolbarButton, ToolButton, ColorPicker, ColorfulPenIcon, RotateRightIcon, useNewSketch
+    toolbar/   Toolbar, ToolbarButton, ToolButton, ColorPicker, ColorfulPenIcon, RotateRightIcon
     gridSize/  GridSizeControl, GridSizeSlider, useGridResize
     files/     useSketchFiles, useFileDrop, fileMessages
+    newSketch/ useNewSketch
     autosave/  restoreAutosave, autosaveSession, useAutosave
     common/    Dialog, useConfirmation, TextButton, isDialogOpen, Tooltip, layout
   app/       App, Header, Footer, ErrorBoundary, errorReporting, and hooks
@@ -273,7 +274,7 @@ returns carries "Don't ask again" through to `stopAskingBefore(action)`.
   its history replaces, so it lapses on its own at the next one.
 - **Opening a file** (`ui/files/`): the question comes only after the file has
   decoded, so a bad file reports its failure and asks nothing.
-- **New sketch** (`ui/toolbar/useNewSketch.ts`): a blank canvas at the same
+- **New sketch** (`ui/newSketch/`): a blank canvas at the same
   size, with no history. Clear canvas is an undo step, so it asks nothing, but
   it leaves the drawing one undo away, in memory and in the autosave; New
   sketch is how a drawing leaves the device. It clears the autosave at once

@@ -23,7 +23,7 @@ import {
     store,
 } from "../../test/storeHelpers";
 import { clearSavedWorkspace } from "../autosave/autosaveSession";
-import { Toolbar } from "./Toolbar";
+import { Toolbar } from "../toolbar/Toolbar";
 import { NEW_SKETCH_QUESTION } from "./useNewSketch";
 
 // The session is tested in `useAutosave.test`; here only the call is watched.

@@ -1,3 +1,9 @@
+/**
+ * @file Autosave as the app runs it, over the in-memory IndexedDB: when it
+ * writes, what it holds back when opening could not read the device, the
+ * question it asks, and how it keeps in step with other tabs.
+ */
+
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import {
     afterEach,
@@ -16,32 +22,30 @@ import {
 } from "../../domain/grid";
 import { DEFAULT_PEN_COLOR } from "../../domain/tools";
 import type { Workspace } from "../../domain/workspace";
-import {
-    encodeAutosave,
-    openAutosaveChannel,
-    readAutosave,
-    writeAutosave,
-} from "../../io/autosave";
+import { encodeAutosave, readAutosave, writeAutosave } from "../../io/autosave";
+import { openAutosaveChannel } from "../../io/autosaveChannel";
 import { workspaceOf } from "../../state/sketchStore";
 import {
     deleteAutosaveDatabase,
     writeStoredRecord,
 } from "../../test/autosaveDatabase";
+import { deferred } from "../../test/deferred";
 import { expectLogged } from "../../test/logCapture";
 import { button, expectNoDialog } from "../../test/queries";
 import { actions, paintStroke, store } from "../../test/storeHelpers";
 import { NoticeDialog } from "../common/Dialog";
+import { AUTOSAVE_DELAY } from "./autosaveSession";
 import {
-    AUTOSAVE_DELAY,
-    RESTORE_DIALOG_TITLE,
     RESTORE_TIMEOUT,
     restoreAutosave,
     type Restored,
-    useAutosave,
-} from "./autosave";
+} from "./restoreAutosave";
+import { RESTORE_DIALOG_TITLE, useAutosave } from "./useAutosave";
 
-// The real storage, over the in-memory IndexedDB, with its calls counted.
+// The real storage, over the in-memory IndexedDB, with its calls counted,
+// and the real channel between tabs, with the tab each call opened.
 vi.mock("../../io/autosave", { spy: true });
+vi.mock("../../io/autosaveChannel", { spy: true });
 
 beforeEach(async () => {
     // `restoreMocks` clears the calls of a module's spies but keeps what a
@@ -89,18 +93,6 @@ const EARLIER = drawing("#123456");
 const keepOnDevice = (workspace: Workspace) =>
     writeStoredRecord(encodeAutosave(workspace));
 
-/** A promise the test settles when it chooses. */
-const deferred = <T,>() => {
-    let resolve!: (value: T) => void;
-    let reject!: (error: unknown) => void;
-    const promise = new Promise<T>((settle, fail) => {
-        resolve = settle;
-        reject = fail;
-    });
-
-    return { promise, resolve, reject };
-};
-
 /**
  * Another tab saving `workspace` and saying so. Resolves once this tab has
  * heard, which it shows by reading the device.
@@ -120,97 +112,6 @@ const saveInAnotherTab = async (workspace: Workspace) => {
     );
     await vi.mocked(readAutosave).mock.results.at(-1)!.value;
 };
-
-describe("restoreAutosave", () => {
-    it("puts back the drawing, its history and the settings", async () => {
-        actions().setGridSize(4);
-        actions().setTool("eraser");
-        actions().toggleSymmetry("leftRight");
-        actions().setPenColor("#123456");
-        paintStroke(0);
-        const before = workspaceOf(store());
-        await writeAutosave(before);
-        actions().setGridSize(8);
-        actions().setTool("pen");
-
-        expect(await restoreAutosave()).toEqual({
-            isKnown: true,
-            answer: null,
-        });
-
-        expect(workspaceOf(store())).toEqual(before);
-        expect(store().document.strokeBaseline).toBeNull();
-    });
-
-    it("keeps the restored history working", async () => {
-        actions().setGridSize(4);
-        actions().setPenColor("#123456");
-        paintStroke(0);
-        await writeAutosave(workspaceOf(store()));
-        actions().setGridSize(8);
-
-        await restoreAutosave();
-        actions().undo();
-
-        expect(store().document.colors[0]).toBe("#FFFFFF");
-    });
-
-    it("opens blank when nothing was saved, knowing there is nothing", async () => {
-        const before = store().document;
-
-        expect(await restoreAutosave()).toEqual({
-            isKnown: true,
-            answer: null,
-        });
-
-        expect(store().document).toBe(before);
-    });
-
-    it("ignores, and warns about, a record this version cannot use", async () => {
-        await writeStoredRecord({ version: 99 });
-        const before = store().document;
-
-        await restoreAutosave();
-
-        expect(store().document).toBe(before);
-        expectLogged(
-            "warn",
-            "autosave",
-            "autosave ignored: not a workspace this version can use"
-        );
-    });
-
-    it("opens blank, and warns, when storage cannot be read", async () => {
-        vi.stubGlobal("indexedDB", undefined);
-
-        // Not knowing what the device holds, autosave must look first.
-        expect(await restoreAutosave()).toEqual({
-            isKnown: false,
-            answer: null,
-        });
-
-        expectLogged("warn", "autosave", "autosave could not be read");
-    });
-
-    it("gives up when storage does not answer in time, handing on the read", async () => {
-        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-        vi.spyOn(indexedDB, "open").mockReturnValue({} as IDBOpenDBRequest);
-
-        const restoring = restoreAutosave();
-        await vi.advanceTimersByTimeAsync(RESTORE_TIMEOUT);
-        const restored = await restoring;
-        vi.useRealTimers();
-
-        // The very read that was late, which may still answer.
-        expect(restored.isKnown).toBe(false);
-        expect(restored.answer).toBe(lastRead());
-        expectLogged("warn", "autosave", "autosave could not be read", {
-            error: expect.objectContaining<{ message: unknown }>({
-                message: expect.stringContaining(`${RESTORE_TIMEOUT} ms`),
-            }),
-        });
-    });
-});
 
 const writes = () => vi.mocked(writeAutosave).mock.calls.length;
 

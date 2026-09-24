@@ -1,8 +1,9 @@
 /** @file The application shell: header, settings panel, canvas and footer. */
 
+import type { Restored } from "../ui/autosave/restoreAutosave";
+import { useAutosave } from "../ui/autosave/useAutosave";
 import { Canvas } from "../ui/canvas/Canvas";
 import { NoticeDialog } from "../ui/common/Dialog";
-import { type Restored, useAutosave } from "../ui/files/autosave";
 import { Toolbar } from "../ui/toolbar/Toolbar";
 import { Footer } from "./Footer";
 import { Header } from "./Header";

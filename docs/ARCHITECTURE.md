@@ -9,13 +9,14 @@ a line needs one; this document holds the reasoning that spans files.
 src/
   log/       the logger, which every layer may use
   domain/    pure rules: grid, color, line, tools, history, sketchDocument, workspace
-  io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosave
+  io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosave, autosaveChannel
   state/     sketchStore, the one Zustand store
   ui/
     canvas/    Canvas, CanvasRow, CanvasCell, useCellColor, usePaintGestures
     toolbar/   Toolbar, ToolbarButton, ColorPicker, ColorfulPenIcon, useNewSketch
     gridSize/  GridSizeControl, GridSizeSlider, useGridResize
-    files/     useSketchFiles, fileMessages, autosave
+    files/     useSketchFiles, fileMessages
+    autosave/  restoreAutosave, autosaveSession, useAutosave
     common/    Dialog, isDialogOpen, Tooltip, panelSize
   app/       App, Header, Footer, ErrorBoundary, errorReporting, and hooks
   styles/    index.css, the Tailwind entry point and design tokens
@@ -288,11 +289,11 @@ can turn those questions back on, so keeping them would make them permanent.
   and restoring fell from up to 265 ms to under 40. A step never changes once
   recorded, so each is converted once and remembered, by identity, and the
   steps restored are remembered as the arrays they were read from.
-- **When** (`useAutosave` in `ui/files/autosave.ts`): 500 ms after edits
-  settle, so a burst writes once; at once when the page is hidden or
-  unloaded, because a phone can end a background tab without warning. A save
-  that falls due during a stroke waits for the stroke to end rather than
-  stall the drag.
+- **When** (`autosaveSession` in `ui/autosave/`, which `useAutosave` starts
+  and stops): 500 ms after edits settle, so a burst writes once; at once when
+  the page is hidden or unloaded, because a phone can end a background tab
+  without warning. A save that falls due during a stroke waits for the stroke
+  to end rather than stall the drag.
 - **What:** the drawing as last committed (`committedDocument`). A stroke
   still being drawn is not an undo step yet, so saving its cells would keep
   paint that undo could never take away; leaving the page mid-stroke keeps
@@ -316,7 +317,7 @@ can turn those questions back on, so keeping them would make them permanent.
 - **Other tabs:** every tab shares the one record, so a tab left open with an
   older drawing would otherwise write it over newer work the moment it was
   used. After each save a tab announces it on a `BroadcastChannel`
-  (`openAutosaveChannel`). A tab that hears one, with nothing of its own
+  (`io/autosaveChannel.ts`). A tab that hears one, with nothing of its own
   waiting to be written and no stroke open, reads the record and takes it
   up, which is no change of its own to write back. A page restored from the
   back-forward cache, which may have missed announcements, does the same.

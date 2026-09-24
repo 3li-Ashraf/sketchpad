@@ -72,9 +72,10 @@ wrong way:
 src/
   log/      the logger: warnings and errors, to the browser console
   domain/   the rules of a sketch: grid, colors, tools, history, editing
-  io/       browser I/O: the .skpd format, compression, PNG export, downloads
+  io/       browser I/O: the .skpd format, compression, PNG export, downloads,
+            the autosave record and the channel between tabs
   state/    the Zustand store, which applies domain edits
-  ui/       canvas/, toolbar/, gridSize/, files/ and common/ components
+  ui/       canvas/, toolbar/, gridSize/, files/, autosave/ and common/
   app/      the shell that lays them out, and catches crashes
 ```
 

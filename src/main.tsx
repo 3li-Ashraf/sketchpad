@@ -17,7 +17,7 @@ import {
     installGlobalErrorHandlers,
     reactErrorHandlers,
 } from "./app/errorReporting";
-import { restoreAutosave } from "./ui/files/autosave";
+import { restoreAutosave } from "./ui/autosave/restoreAutosave";
 
 installGlobalErrorHandlers();
 

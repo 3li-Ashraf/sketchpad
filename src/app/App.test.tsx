@@ -20,7 +20,7 @@ import { readAutosave } from "../io/autosave";
 import { workspaceOf } from "../state/sketchStore";
 import { deleteAutosaveDatabase } from "../test/autosaveDatabase";
 import { canvasColors, paintStroke, store } from "../test/storeHelpers";
-import type { Restored } from "../ui/files/autosave";
+import type { Restored } from "../ui/autosave/restoreAutosave";
 import { App } from "./App";
 
 const toggle = () => screen.getByRole("button", { name: "Settings" });

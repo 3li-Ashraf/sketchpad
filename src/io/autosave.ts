@@ -1,8 +1,8 @@
 /**
  * @file The autosave: the workspace kept in the browser's IndexedDB between
  * visits, on this device only, and the only definition of the record it is
- * kept as. Every tab shares the one record, so each tells the others over a
- * `BroadcastChannel` when it has written it.
+ * kept as. Every tab shares the one record; `autosaveChannel` is how they tell
+ * each other they have written it.
  *
  * IndexedDB rather than `localStorage`: a full undo history can outgrow the
  * few megabytes `localStorage` allows, and IndexedDB stores structured values
@@ -298,37 +298,6 @@ export const readAutosave = async (): Promise<Workspace | null> => {
     }
 
     return workspace;
-};
-
-const CHANNEL_NAME = "sketchpad-autosave";
-
-/** How a tab tells the others it has saved, and hears when they have. */
-export interface AutosaveChannel {
-    /** Tells every other tab a save has been written. */
-    announce: () => void;
-    close: () => void;
-}
-
-/**
- * Opens this tab's line to the others: `onSavedElsewhere` hears each save
- * another tab announces, never one this channel announced itself. With no
- * `BroadcastChannel`, nothing is heard and announcing does nothing, as with a
- * single tab.
- */
-export const openAutosaveChannel = (
-    onSavedElsewhere: () => void
-): AutosaveChannel => {
-    if (typeof BroadcastChannel === "undefined") {
-        return { announce: () => {}, close: () => {} };
-    }
-
-    const channel = new BroadcastChannel(CHANNEL_NAME);
-    channel.onmessage = onSavedElsewhere;
-
-    return {
-        announce: () => channel.postMessage("saved"),
-        close: () => channel.close(),
-    };
 };
 
 /** Replaces the saved workspace; resolves once it is committed to disk. */

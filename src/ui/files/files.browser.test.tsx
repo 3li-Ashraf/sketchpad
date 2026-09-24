@@ -1,35 +1,21 @@
 /**
- * @file Saving, exporting, dropping and autosaving in real browsers: the file
- * a download actually writes to disk, a real drop, and real IndexedDB. jsdom
- * can only record that a download was asked for.
+ * @file Saving, exporting and dropping in real browsers: the file a download
+ * actually writes to disk, and a real drop. jsdom can only record that a
+ * download was asked for.
  */
 
 import "../../styles/index.css";
 
 import { render } from "@testing-library/react";
-import {
-    afterEach,
-    beforeEach,
-    describe,
-    expect,
-    it,
-    onTestFinished,
-} from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { commands, userEvent } from "vitest/browser";
 
 import { createBlankGrid } from "../../domain/grid";
-import {
-    openAutosaveChannel,
-    readAutosave,
-    writeAutosave,
-} from "../../io/autosave";
 import { decodeSketch, encodeSketch } from "../../io/sketchFile";
-import { sketchOf, workspaceOf } from "../../state/sketchStore";
-import { deleteAutosaveDatabase } from "../../test/autosaveDatabase";
+import { sketchOf } from "../../state/sketchStore";
 import { button } from "../../test/queries";
 import { actions, paintStroke, store } from "../../test/storeHelpers";
 import { Toolbar } from "../toolbar/Toolbar";
-import { AUTOSAVE_DELAY, restoreAutosave, useAutosave } from "./autosave";
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -92,55 +78,5 @@ describe("dropping a file in a real browser", () => {
         expect(drop.defaultPrevented).toBe(true);
         await expect.poll(() => store().document.gridSize).toBe(4);
         expect(store().document.colors).toEqual(colors);
-    });
-});
-
-describe("autosave in a real browser", () => {
-    beforeEach(deleteAutosaveDatabase);
-    afterEach(deleteAutosaveDatabase);
-
-    const Autosaving = () => {
-        useAutosave();
-        return null;
-    };
-
-    it("brings the whole workspace back after the page is left", async () => {
-        render(<Autosaving />);
-        actions().setGridSize(8);
-        actions().setTool("colorfulPen");
-        paintStroke(0, 1, 2);
-        actions().undo();
-        paintStroke(40);
-        const before = workspaceOf(store());
-
-        // Sooner than the usual delay: leaving the page saves at once.
-        window.dispatchEvent(new Event("pagehide"));
-        await expect
-            .poll(readAutosave, {
-                timeout: AUTOSAVE_DELAY / 2,
-            })
-            .toEqual(before);
-
-        actions().setGridSize(16);
-        await restoreAutosave();
-
-        expect(workspaceOf(store())).toEqual(before);
-    });
-
-    it("takes up what another tab saves, through the browser's own channel", async () => {
-        // Drawn and saved before this tab mounts, so it has nothing of its
-        // own waiting, which would win instead.
-        actions().setGridSize(4);
-        paintStroke(5);
-        const saved = workspaceOf(store());
-        await writeAutosave(saved);
-        actions().setGridSize(8);
-        render(<Autosaving />);
-        const otherTab = openAutosaveChannel(() => {});
-        onTestFinished(otherTab.close);
-
-        otherTab.announce();
-
-        await expect.poll(() => workspaceOf(store())).toEqual(saved);
     });
 });

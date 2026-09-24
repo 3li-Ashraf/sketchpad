@@ -12,7 +12,7 @@ src/
   io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosave
   state/     sketchStore, the one Zustand store
   ui/
-    canvas/    Canvas, CanvasCell, usePaintGestures
+    canvas/    Canvas, CanvasRow, CanvasCell, useCellColor, usePaintGestures
     toolbar/   Toolbar, ToolbarButton, ColorPicker, ColorfulPenIcon, useNewSketch
     gridSize/  GridSizeControl, GridSizeSlider, useGridResize
     files/     useSketchFiles, fileMessages, autosave
@@ -186,18 +186,30 @@ so it survives the retry.
 
 ## Rendering and input
 
-The canvas is a CSS grid of one `CanvasCell` per cell. Each cell is memoized
-and subscribes to its own color, and the cell elements are rebuilt only when
-the grid size changes, so a stroke re-renders only the cells it touched. Grid
-lines are an `outline` rule on the container, so toggling them changes one
-class and no cell.
+The canvas is a CSS grid of one memoized `CanvasCell` per cell, built only
+when the grid size changes. Two choices keep a stroke's cost to the cells it
+touched:
 
-Measured on the production build in desktop Chromium at 64×64 (4096 cells):
+- **One subscription for every cell** (`useCellColor`). A store selector per
+  cell ran 4096 of them on every change to the store, colors or not. One
+  listener instead compares the colors when they change and wakes only the
+  cells whose color did, across both lengths, since a resize keeps the
+  elements of the cells whose index survives.
+- **Cells grouped in rows** (`CanvasRow`). From one flat list of 4096, React
+  walked every cell to reach the one that changed. A memoized row per grid
+  row, `display: contents` so its cells stay items of the grid, cuts that to
+  the row and the list of rows.
 
-| Operation                                    | Cost                      |
-| -------------------------------------------- | ------------------------- |
-| One pointer move of a drag, including render | 0.6 ms median, 1.3 ms max |
-| Resizing from 8×8 to 64×64                   | about 25 ms of script     |
+Grid lines are an `outline` rule on the surface, reaching the cells through
+their rows, so toggling them changes one class and no cell.
+
+Measured on the production build in desktop Chromium at 64×64 (4096 cells),
+from dispatch until React has rendered, before and after those two changes:
+
+| Operation                                    | Before                    | After                     |
+| -------------------------------------------- | ------------------------- | ------------------------- |
+| One pointer move of a drag, including render | 0.6 ms median, p99 1.3 ms | 0.1 ms median, p99 0.3 ms |
+| Resizing from 8×8 to 64×64                   | about 54 ms               | about 22 ms               |
 
 Drawing fits many times over in a frame, so a `<canvas>` renderer would not pay
 for what it costs: DOM cells can be queried in tests, and grid lines are one

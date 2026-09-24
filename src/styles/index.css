@@ -35,8 +35,9 @@
 
 @layer components {
   /* From the container, so toggling grid lines touches one element, not every
-     cell. `outline` because it takes no part in layout. */
-  .canvas-surface--lined > * {
+     cell. `outline` because it takes no part in layout. The cells are the
+     surface's grandchildren: each row between is `display: contents`. */
+  .canvas-surface--lined > * > * {
     outline: 1px solid var(--color-grid-line);
   }
 

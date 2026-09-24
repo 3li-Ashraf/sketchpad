@@ -8,6 +8,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BLANK_CELL_COLOR } from "../../domain/grid";
+import { useSketchStore } from "../../state/sketchStore";
 import {
     actions,
     canvasColors,
@@ -50,7 +51,8 @@ const cellPoint = (row: number, column: number) => ({
 
 const surface = () => screen.getByRole("img", { name: /^Canvas/ });
 
-const cells = () => Array.from(surface().children);
+/** The cells, in order: the surface's grandchildren, a row of them apiece. */
+const cells = () => Array.from(surface().querySelectorAll(":scope > * > *"));
 
 const colorAt = (index: number) =>
     (cells()[index] as HTMLElement).style.backgroundColor;
@@ -137,6 +139,50 @@ describe("rendering", () => {
         expect(cells()).toHaveLength(16);
     });
 
+    it("groups the cells into one element per row", () => {
+        render(<Canvas />);
+
+        const rows = Array.from(surface().children);
+
+        expect(rows).toHaveLength(GRID_SIZE);
+        rows.forEach((row) => expect(row.children).toHaveLength(GRID_SIZE));
+    });
+
+    it("shows the new colors in cells a resize keeps", () => {
+        // Cell 0 keeps its element across the resize, so it has to be told
+        // its color changed even though the grid is a different length.
+        render(<Canvas />);
+        act(() => paintStroke(0, 1));
+
+        act(() => actions().setGridSize(4));
+
+        expect(colorAt(0)).toBe("rgb(255, 255, 255)");
+        expect(colorAt(1)).toBe("rgb(255, 255, 255)");
+
+        // Growing again: new cells too, which have no element yet to wake.
+        act(() => paintStroke(0));
+        act(() => actions().setGridSize(GRID_SIZE));
+
+        expect(cells()).toHaveLength(GRID_SIZE ** 2);
+        expect(colorAt(0)).toBe("rgb(255, 255, 255)");
+    });
+
+    it("keeps every canvas mounted at once up to date", () => {
+        render(<Canvas />);
+        render(<Canvas />);
+        const [first, second] = screen.getAllByRole("img", { name: /^Canvas/ });
+        const colorIn = (canvas: HTMLElement) =>
+            (canvas.querySelector(":scope > * > *") as HTMLElement).style
+                .backgroundColor;
+
+        act(() => paintStroke(0));
+
+        expect([colorIn(first), colorIn(second)]).toEqual([
+            "rgb(0, 0, 0)",
+            "rgb(0, 0, 0)",
+        ]);
+    });
+
     it("lays the surface out as a square grid of the right size", () => {
         render(<Canvas />);
 
@@ -167,6 +213,15 @@ describe("rendering", () => {
 });
 
 describe("render cost", () => {
+    it("subscribes to the store once for all its cells, not once per cell", () => {
+        const subscribe = vi.spyOn(useSketchStore, "subscribe");
+
+        render(<Canvas />);
+
+        // The canvas's own few, and one for every cell together.
+        expect(subscribe.mock.calls.length).toBeLessThan(GRID_SIZE);
+    });
+
     it("updates the painted cells in place without rebuilding the grid", () => {
         render(<Canvas />);
         const observer = observeCells(surface());

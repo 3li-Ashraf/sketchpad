@@ -2,19 +2,19 @@
 
 import { memo } from "react";
 
-import { useSketchStore } from "../../state/sketchStore";
+import { useCellColor } from "./useCellColor";
 
 interface CanvasCellProps {
     index: number;
 }
 
 /**
- * Subscribes to its own color only, so a stroke re-renders just the cells it
- * changed. Cells carry no listeners: the canvas works out which cell is under
- * the pointer, and grid lines come from a rule on the container.
+ * Re-renders only when its own color changes (`useCellColor`). Cells carry no
+ * listeners: the canvas works out which cell is under the pointer, and grid
+ * lines come from a rule on the surface.
  */
 export const CanvasCell = memo(function CanvasCell({ index }: CanvasCellProps) {
-    const color = useSketchStore((state) => state.document.colors[index]);
+    const color = useCellColor(index);
 
     return <div style={{ backgroundColor: color }} />;
 });

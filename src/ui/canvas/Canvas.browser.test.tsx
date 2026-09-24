@@ -6,7 +6,7 @@
 
 import "../../styles/index.css";
 
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { commands, server, userEvent } from "vitest/browser";
 
@@ -37,7 +37,7 @@ describe("Canvas in a real browser", () => {
     it("lays the grid out as square cells", () => {
         render(<Canvas />);
 
-        const cells = [...surface().children];
+        const cells = [...surface().querySelectorAll(":scope > * > *")];
         const { width, height } = cells[0].getBoundingClientRect();
 
         expect(cells).toHaveLength(GRID_SIZE * GRID_SIZE);
@@ -64,6 +64,23 @@ describe("Canvas in a real browser", () => {
             expect(store().document.undoStack).toHaveLength(1);
         }
     );
+
+    it("outlines every cell with grid lines, through the rows around them", () => {
+        render(<Canvas />);
+        const outlineOf = (index: number) =>
+            getComputedStyle(
+                surface().querySelectorAll(":scope > * > *")[index]
+            ).outlineStyle;
+
+        expect([outlineOf(0), outlineOf(GRID_SIZE ** 2 - 1)]).toEqual([
+            "solid",
+            "solid",
+        ]);
+
+        act(() => actions().toggleGridLines());
+
+        expect(outlineOf(0)).toBe("none");
+    });
 
     it("opts out of the browser's touch gestures, which would swallow a drag", () => {
         render(<Canvas />);

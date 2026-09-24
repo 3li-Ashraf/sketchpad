@@ -1,6 +1,7 @@
 /** @file One cell of the canvas. It renders a color and nothing else. */
 
 import { memo } from "react";
+
 import { useSketchStore } from "../../state/sketchStore";
 
 interface CanvasCellProps {
@@ -8,16 +9,12 @@ interface CanvasCellProps {
 }
 
 /**
- * Subscribes to one cell's color, so painting re-renders only the cells that
- * changed rather than the whole grid. That is why the store replaces `colors`
- * lazily: an untouched cell reads the same string and does not re-render.
- *
- * Cells carry no event listeners. The canvas resolves the pointer position
- * arithmetically, and grid lines are drawn by a rule on the container, so
- * nothing here has to react to either.
+ * Subscribes to its own color only, so a stroke re-renders just the cells it
+ * changed. Cells carry no listeners: the canvas works out which cell is under
+ * the pointer, and grid lines come from a rule on the container.
  */
 export const CanvasCell = memo(function CanvasCell({ index }: CanvasCellProps) {
-    const color = useSketchStore((state) => state.colors[index]);
+    const color = useSketchStore((state) => state.document.colors[index]);
 
     return <div style={{ backgroundColor: color }} />;
 });

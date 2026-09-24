@@ -1,17 +1,18 @@
 /**
  * @file Turns pointer input over the canvas into store actions. It owns the
- * gesture — which pointer is drawing, where it was last, when the stroke ends —
- * and none of the drawing rules, which stay in the store and the domain layer.
+ * gesture (which pointer is drawing, where it was last, when the stroke ends)
+ * and none of the drawing rules.
  */
 
 import { useCallback, useEffect, useRef } from "react";
-import { toCellIndex, type CellPosition } from "../../domain/grid";
+
+import { type CellPosition, toCellIndex } from "../../domain/grid";
 import { traceLine } from "../../domain/line";
 import { isStrokeTool } from "../../domain/tools";
-import { useSketchStore } from "../../state/sketchStore";
+import { useSketchActions, useSketchStore } from "../../state/sketchStore";
 
-// Pointer capture is an enhancement, not a requirement, and is unavailable in
-// some environments — jsdom implements none of it, so every call throws there.
+// Capture is an enhancement: without it the window listeners below still end
+// the stroke, so an environment that refuses it is not an error.
 const tryPointerCapture = (
     surface: HTMLElement,
     pointerId: number,
@@ -22,8 +23,7 @@ const tryPointerCapture = (
         else if (surface.hasPointerCapture(pointerId))
             surface.releasePointerCapture(pointerId);
     } catch {
-        // Swallowed: without capture the stroke still works, because the
-        // window-level listeners below are what end it.
+        // Drawing works without capture.
     }
 };
 
@@ -37,20 +37,16 @@ interface PaintGestures {
 }
 
 /**
- * Pointer events cover mouse, touch and pen in one path, so there is no separate
- * touch handling. The cell under the pointer is derived arithmetically from the
- * surface rectangle rather than from the DOM, which is what lets the cells
- * themselves be inert divs with no listeners of their own.
+ * Pointer events cover mouse, touch and pen in one path. The cell under the
+ * pointer is computed from the surface rectangle, and the cells between two
+ * samples are traced, so a fast drag stays connected.
  */
 export const usePaintGestures = (): PaintGestures => {
     const surfaceRef = useRef<HTMLDivElement>(null);
     const activePointerRef = useRef<number | null>(null);
     const lastPositionRef = useRef<CellPosition | null>(null);
 
-    const beginStroke = useSketchStore((state) => state.beginStroke);
-    const paintCells = useSketchStore((state) => state.paintCells);
-    const endStroke = useSketchStore((state) => state.endStroke);
-    const fillFrom = useSketchStore((state) => state.fillFrom);
+    const { beginStroke, paintCells, endStroke, fillFrom } = useSketchActions();
 
     const cellPositionAt = useCallback(
         (event: React.PointerEvent<HTMLDivElement>): CellPosition | null => {
@@ -60,7 +56,7 @@ export const usePaintGestures = (): PaintGestures => {
             const rect = surface.getBoundingClientRect();
             if (rect.width === 0 || rect.height === 0) return null;
 
-            const { gridSize } = useSketchStore.getState();
+            const { gridSize } = useSketchStore.getState().document;
             const column = Math.floor(
                 ((event.clientX - rect.left) / rect.width) * gridSize
             );
@@ -93,9 +89,8 @@ export const usePaintGestures = (): PaintGestures => {
 
     const handlePointerDown = useCallback(
         (event: React.PointerEvent<HTMLDivElement>) => {
-            // Primary button only, and one pointer at a time: a second finger
-            // arriving mid-stroke would otherwise paint a second, interleaved
-            // line into the same undo step.
+            // Primary button, one pointer at a time: a second finger would
+            // otherwise interleave another line into the same undo step.
             if (event.button !== 0 || activePointerRef.current !== null) return;
 
             const position = cellPositionAt(event);
@@ -103,8 +98,8 @@ export const usePaintGestures = (): PaintGestures => {
 
             event.preventDefault();
 
-            const { gridSize, tool } = useSketchStore.getState();
-            const index = toCellIndex(position, gridSize);
+            const { document, tool } = useSketchStore.getState();
+            const index = toCellIndex(position, document.gridSize);
 
             if (!isStrokeTool(tool)) {
                 fillFrom(index);
@@ -129,23 +124,21 @@ export const usePaintGestures = (): PaintGestures => {
 
             const position = cellPositionAt(event);
             if (!position) {
-                // Leaving the canvas pauses the stroke. Forgetting the last
-                // position means coming back starts a new segment instead of
-                // drawing a line across the gap.
+                // Leaving the canvas pauses the stroke; coming back starts a
+                // new segment rather than drawing a line across the gap.
                 lastPositionRef.current = null;
                 return;
             }
 
             const previous = lastPositionRef.current;
             if (
-                previous &&
-                previous.row === position.row &&
+                previous?.row === position.row &&
                 previous.column === position.column
             ) {
                 return;
             }
 
-            const { gridSize } = useSketchStore.getState();
+            const { gridSize } = useSketchStore.getState().document;
             const indices: number[] = [];
 
             if (previous) {
@@ -162,11 +155,11 @@ export const usePaintGestures = (): PaintGestures => {
         [cellPositionAt, paintCells]
     );
 
-    // Release and cancel are watched on the window, not the surface, so the
-    // stroke is still committed when the pointer comes up off-canvas or the
-    // gesture is cancelled outright.
+    // On the window, so a stroke still commits when the pointer comes up
+    // off the canvas or the gesture is cancelled outright.
     useEffect(() => {
-        const handleRelease = (event: PointerEvent) => finishStroke(event.pointerId);
+        const handleRelease = (event: PointerEvent) =>
+            finishStroke(event.pointerId);
 
         window.addEventListener("pointerup", handleRelease);
         window.addEventListener("pointercancel", handleRelease);
@@ -177,8 +170,8 @@ export const usePaintGestures = (): PaintGestures => {
         };
     }, [finishStroke]);
 
-    // A long press on touch, or a right-drag with a mouse, would otherwise open
-    // the context menu over the drawing and cut the stroke short.
+    // A long press on touch, or a right-drag, would open the context menu
+    // over the drawing and cut the stroke short.
     const preventContextMenu = useCallback(
         (event: React.MouseEvent) => event.preventDefault(),
         []

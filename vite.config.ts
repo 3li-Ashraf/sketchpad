@@ -1,27 +1,39 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { playwright } from "@vitest/browser-playwright";
+import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
-export default defineConfig({
-    // The app is served from a GitHub Pages project path rather than a domain
-    // root, so assets have to be requested under the repository name. Keep this
-    // in step with `homepage` in package.json.
+import { browserCommands } from "./browserCommands.ts";
+
+/** The three engines behind every major browser. */
+const ENGINES = ["chromium", "firefox", "webkit"] as const;
+
+/**
+ * The engines the browser tests run in: all three, unless `TEST_BROWSERS`
+ * (from the environment or an untracked `.env.local`) names fewer, for a
+ * machine where one of them cannot run.
+ */
+const testedEngines = (mode: string) => {
+    const wanted = loadEnv(mode, process.cwd(), "TEST_").TEST_BROWSERS;
+
+    return wanted
+        ? ENGINES.filter((engine) => wanted.split(",").includes(engine))
+        : ENGINES;
+};
+
+export default defineConfig(({ mode }) => ({
+    // Served from a GitHub Pages project path, not a domain root. Keep in step
+    // with `homepage` in package.json.
     base: "/sketchpad/",
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     build: {
         rollupOptions: {
             output: {
-                // React and the icon set are most of the bundle and change only
-                // when a dependency is upgraded, while the app around them
-                // changes with every deploy. Splitting them apart means a
-                // returning visitor re-downloads the app chunk alone: file names
-                // are content-hashed, so the vendor chunk's name — and the
-                // cached copy of it — stays put across an app-only change.
-                //
-                // `codeSplitting` rather than a `manualChunks` map: Vite 8 bundles
-                // with Rolldown, where `manualChunks` accepts only a function and
-                // this is the declarative form. It replaces the older
-                // `advancedChunks` option, which took the same shape but is now
-                // deprecated.
+                // React and the icons change only on a dependency upgrade, so
+                // splitting them out lets a returning visitor keep the cached
+                // vendor chunk across app-only deploys. `codeSplitting` is
+                // Rolldown's declarative replacement for `manualChunks`.
                 codeSplitting: {
                     groups: [{ name: "vendor", test: /node_modules/ }],
                 },
@@ -29,22 +41,69 @@ export default defineConfig({
         },
     },
     test: {
-        environment: "jsdom",
-        setupFiles: ["./src/test/setup.ts"],
-        include: ["src/**/*.test.{ts,tsx}"],
-        // Spies and stubbed globals are undone between tests, so no test has to
-        // remember to clean up after itself.
         restoreMocks: true,
         unstubGlobals: true,
+        projects: [
+            {
+                // Plain modules in Node: fast, and proof they need no DOM. A
+                // file that does opts in with `@vitest-environment jsdom`.
+                extends: true,
+                test: {
+                    name: "unit",
+                    environment: "node",
+                    include: ["src/**/*.test.ts"],
+                    exclude: ["src/**/*.browser.test.ts"],
+                    setupFiles: ["./src/test/setup.ts"],
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    name: "dom",
+                    environment: "jsdom",
+                    include: ["src/**/*.test.tsx"],
+                    exclude: ["src/**/*.browser.test.tsx"],
+                    setupFiles: [
+                        "./src/test/setup.ts",
+                        "./src/test/setupDom.ts",
+                        "./src/test/setupJsdom.ts",
+                    ],
+                },
+            },
+            {
+                // What jsdom cannot show: real image decoding, the browser's
+                // own compression, the top layer and focus, and layout.
+                extends: true,
+                test: {
+                    name: "browser",
+                    include: ["src/**/*.browser.test.{ts,tsx}"],
+                    setupFiles: [
+                        "./src/test/setup.ts",
+                        "./src/test/setupDom.ts",
+                    ],
+                    browser: {
+                        enabled: true,
+                        provider: playwright(),
+                        headless: true,
+                        instances: testedEngines(mode).map((browser) => ({
+                            browser,
+                        })),
+                        commands: browserCommands,
+                    },
+                },
+            },
+        ],
         coverage: {
             include: ["src/**/*.{ts,tsx}"],
-            exclude: [
-                "src/**/*.test.{ts,tsx}",
-                "src/test/**",
-                "src/vite-env.d.ts",
-                // The bootstrap: it mounts the app and holds no logic of its own.
-                "src/main.tsx",
-            ],
+            exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/main.tsx"],
+            // Just under what the suite reaches, so a change that leaves new
+            // code untested fails `npm run check`.
+            thresholds: {
+                lines: 100,
+                functions: 100,
+                statements: 99.5,
+                branches: 98,
+            },
         },
     },
-});
+}));

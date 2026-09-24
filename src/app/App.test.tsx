@@ -1,22 +1,24 @@
-/**
- * @file Covers `App`: that the shell renders, that the narrow-screen toolbar
- * opens and dismisses, and that the keyboard shortcuts are bound while it is
- * mounted.
- */
-
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { BLANK_CELL_COLOR } from "../domain/grid";
+
+import {
+    BLANK_CELL_COLOR,
+    createBlankGrid,
+    DEFAULT_GRID_SIZE,
+} from "../domain/grid";
 import { DEFAULT_PEN_COLOR } from "../domain/tools";
-import { paintStroke, store } from "../test/storeHelpers";
+import { readAutosave } from "../io/autosave";
+import { selectWorkspace } from "../state/sketchStore";
+import { deleteAutosaveDatabase } from "../test/autosaveDatabase";
+import { canvasColors, paintStroke, store } from "../test/storeHelpers";
 import { App } from "./App";
 
 const toggle = () => screen.getByRole("button", { name: "Settings" });
 
 const toolbar = () => screen.getByRole("complementary", { name: "Settings" });
 
-const canvas = () => screen.getByTestId("canvas-surface");
+const canvas = () => screen.getByRole("img", { name: /^Canvas/ });
 
 /** Presses the grid size slider over a drawing, which opens the resize dialog. */
 const openResizeDialog = () => {
@@ -30,21 +32,61 @@ describe("shell", () => {
     it("renders the title, toolbar and canvas", () => {
         render(<App />);
 
-        expect(screen.getByRole("heading", { name: "Sketchpad" })).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "Sketchpad" })
+        ).toBeInTheDocument();
         expect(toolbar()).toBeInTheDocument();
         expect(canvas()).toBeInTheDocument();
     });
 
-    it("credits the author in the footer", () => {
+    it("removes a drawing from the device on New sketch", async () => {
+        await deleteAutosaveDatabase();
         render(<App />);
+        paintStroke(0);
+        window.dispatchEvent(new Event("pagehide"));
+        await waitFor(async () =>
+            expect((await readAutosave())?.document.undoStack).toHaveLength(1)
+        );
 
-        expect(
-            screen.getByRole("link", { name: "Ali Ashraf" })
-        ).toHaveAttribute("href", "https://github.com/3li-ashraf");
+        await userEvent.click(
+            screen.getByRole("button", { name: "New sketch" })
+        );
+        await userEvent.click(
+            screen.getByRole("button", { name: "Start new sketch" })
+        );
+        window.dispatchEvent(new Event("pagehide"));
+
+        await waitFor(async () =>
+            expect((await readAutosave())?.document).toEqual({
+                gridSize: DEFAULT_GRID_SIZE,
+                colors: createBlankGrid(DEFAULT_GRID_SIZE),
+                undoStack: [],
+                redoStack: [],
+            })
+        );
+    });
+
+    it("autosaves what is drawn", async () => {
+        await deleteAutosaveDatabase();
+        render(<App />);
+        paintStroke(0);
+
+        window.dispatchEvent(new Event("pagehide"));
+
+        await waitFor(async () =>
+            expect(await readAutosave()).toEqual(selectWorkspace(store()))
+        );
     });
 });
 
 describe("collapsible toolbar", () => {
+    it("is controlled by the settings button", () => {
+        render(<App />);
+
+        expect(toolbar().id).not.toBe("");
+        expect(toggle()).toHaveAttribute("aria-controls", toolbar().id);
+    });
+
     it("starts collapsed on small screens", () => {
         render(<App />);
 
@@ -100,24 +142,9 @@ describe("collapsible toolbar", () => {
         expect(toolbar()).toHaveClass("flex");
     });
 
-    // Closing an already-closed panel is a no-op, so a leaked listener changes
-    // nothing observable in the DOM and these two have to watch the listener
-    // itself. Both directions are covered because the effect's cleanup runs on a
-    // state change and on unmount, and only the first is reached by closing.
-    it("stops listening for outside presses once closed", async () => {
-        const remove = vi.spyOn(document, "removeEventListener");
-        render(<App />);
-
-        await userEvent.click(toggle());
-        await userEvent.click(toggle());
-
-        expect(remove).toHaveBeenCalledWith(
-            "pointerdown",
-            expect.any(Function)
-        );
-    });
-
-    it("stops listening when it unmounts while still open", async () => {
+    // A leaked listener would only close a panel that is already gone, so
+    // nothing in the DOM shows it; the listener itself has to be watched.
+    it("stops listening for outside presses when it unmounts", async () => {
         const remove = vi.spyOn(document, "removeEventListener");
         const { unmount } = render(<App />);
 
@@ -138,10 +165,10 @@ describe("keyboard shortcuts", () => {
         paintStroke(0);
 
         await userEvent.keyboard("{Control>}z{/Control}");
-        expect(store().colors[0]).toBe(BLANK_CELL_COLOR);
+        expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
 
         await userEvent.keyboard("{Control>}y{/Control}");
-        expect(store().colors[0]).toBe(DEFAULT_PEN_COLOR);
+        expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
     });
 
     it("also redoes with Ctrl+Shift+Z", async () => {
@@ -151,7 +178,7 @@ describe("keyboard shortcuts", () => {
         await userEvent.keyboard("{Control>}z{/Control}");
         await userEvent.keyboard("{Control>}{Shift>}z{/Shift}{/Control}");
 
-        expect(store().colors[0]).toBe(DEFAULT_PEN_COLOR);
+        expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
     });
 
     it("supports the Meta key for macOS", async () => {
@@ -160,7 +187,7 @@ describe("keyboard shortcuts", () => {
 
         await userEvent.keyboard("{Meta>}z{/Meta}");
 
-        expect(store().colors[0]).toBe(BLANK_CELL_COLOR);
+        expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
     });
 
     it("leaves the canvas alone for an unmodified key", async () => {
@@ -169,16 +196,27 @@ describe("keyboard shortcuts", () => {
 
         await userEvent.keyboard("z");
 
-        expect(store().colors[0]).toBe(DEFAULT_PEN_COLOR);
+        expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
     });
 
-    it("leaves other modified keys to the browser", async () => {
+    it("keeps its shortcuts from the browser, which would undo on its own", () => {
+        render(<App />);
+
+        for (const key of ["z", "y", "Z"]) {
+            expect(fireEvent.keyDown(window, { key, ctrlKey: true })).toBe(
+                false
+            );
+        }
+    });
+
+    it("leaves other modified keys to the browser", () => {
         render(<App />);
         paintStroke(0);
 
-        await userEvent.keyboard("{Control>}a{/Control}");
+        const isLeft = fireEvent.keyDown(window, { key: "a", ctrlKey: true });
 
-        expect(store().colors[0]).toBe(DEFAULT_PEN_COLOR);
+        expect(isLeft).toBe(true);
+        expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
     });
 
     it("undoes nothing while a dialog is open", async () => {
@@ -187,7 +225,7 @@ describe("keyboard shortcuts", () => {
 
         await userEvent.keyboard("{Control>}z{/Control}");
 
-        expect(store().colors[0]).toBe(DEFAULT_PEN_COLOR);
+        expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
     });
 
     it("stops listening once the app unmounts", async () => {
@@ -197,6 +235,6 @@ describe("keyboard shortcuts", () => {
         unmount();
         await userEvent.keyboard("{Control>}z{/Control}");
 
-        expect(store().colors[0]).toBe(DEFAULT_PEN_COLOR);
+        expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
     });
 });

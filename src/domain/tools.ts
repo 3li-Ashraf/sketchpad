@@ -1,7 +1,4 @@
-/**
- * @file What each drawing tool means: how it responds to a drag and what color
- * it lays down. Pure: no DOM, no React, no store.
- */
+/** @file What each drawing tool does with a drag, and what color it lays down. */
 
 import { randomHexColor } from "./color";
 import { BLANK_CELL_COLOR } from "./grid";
@@ -10,31 +7,27 @@ export const DRAWING_TOOLS = ["pen", "colorfulPen", "eraser", "fill"] as const;
 
 export type DrawingTool = (typeof DRAWING_TOOLS)[number];
 
+/** Whether a value read back from storage names one of the tools. */
+export const isDrawingTool = (value: unknown): value is DrawingTool =>
+    (DRAWING_TOOLS as readonly unknown[]).includes(value);
+
 export const DEFAULT_TOOL: DrawingTool = "pen";
 export const DEFAULT_PEN_COLOR = "#000000";
 
 /**
- * Whether the tool paints continuously while the pointer is held down. Fill is
- * the one that does not: it acts once, on press.
- *
- * Two layers act on this. `usePaintGestures` checks it before taking pointer
- * capture, so a non-stroke tool opens no stroke and no pointer move can paint;
- * `paintCells` checks it again and refuses. A new single-shot tool that this
- * predicate does not exclude would silently become a drag tool.
+ * Whether the tool paints while the pointer is held down; fill acts once, on
+ * press. A new single-shot tool must be excluded here, or it silently becomes
+ * a drag tool.
  */
 export const isStrokeTool = (tool: DrawingTool): boolean => tool !== "fill";
 
 /**
- * Whether the tool picks a fresh color for every cell it touches, which means
- * its color cannot be resolved once for a whole call. Every other tool takes the
- * cheaper uniform path in `paintCells`.
- *
- * This has to agree with `strokeColor`: a tool that returns a different color
- * for the same arguments but is missing here would have one cached color smeared
- * across a whole drag. `tools.test` pins the pairing by sampling `strokeColor`
- * for every member of `DRAWING_TOOLS`.
+ * Whether the tool picks a fresh color for every cell. It must agree with
+ * `strokeColor`, or `paintCells` resolves one color and smears it across the
+ * whole drag; `tools.test` checks the pairing for every tool.
  */
-export const paintsPerCell = (tool: DrawingTool): boolean => tool === "colorfulPen";
+export const paintsPerCell = (tool: DrawingTool): boolean =>
+    tool === "colorfulPen";
 
 export const strokeColor = (tool: DrawingTool, penColor: string): string => {
     switch (tool) {

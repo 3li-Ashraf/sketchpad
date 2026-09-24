@@ -1,7 +1,7 @@
 /** @file The page footer: an attribution line and nothing else. */
 
 export const Footer: React.FC = () => (
-    <footer className="text-center text-lg py-2">
+    <footer className="py-2 text-center text-lg">
         <p>
             Copyright &copy; {new Date().getFullYear()} by{" "}
             <a

@@ -1,19 +1,38 @@
-/**
- * @file Covers `domain/tools`. The colorful pen is random, so the tests that
- * separate it from the fixed-color tools sample `strokeColor` repeatedly and
- * count distinct results rather than asserting a value.
- */
+import { describe, expect, it, vi } from "vitest";
 
-import { describe, expect, it } from "vitest";
 import { BLANK_CELL_COLOR } from "./grid";
 import {
     DRAWING_TOOLS,
+    type DrawingTool,
+    isDrawingTool,
     isStrokeTool,
     paintsPerCell,
     strokeColor,
 } from "./tools";
 
 const PEN_COLOR = "#123456";
+
+/** Two colors for one tool, drawn while `Math.random` returns different values. */
+const twoColors = (tool: DrawingTool): [string, string] => {
+    vi.spyOn(Math, "random")
+        .mockReturnValueOnce(0.25)
+        .mockReturnValueOnce(0.75);
+
+    return [strokeColor(tool, PEN_COLOR), strokeColor(tool, PEN_COLOR)];
+};
+
+describe("isDrawingTool", () => {
+    it.each(DRAWING_TOOLS)("names %s", (tool) => {
+        expect(isDrawingTool(tool)).toBe(true);
+    });
+
+    it.each([["spray"], ["Pen"], [""], [undefined], [0], [{}]])(
+        "refuses %j",
+        (value) => {
+            expect(isDrawingTool(value)).toBe(false);
+        }
+    );
+});
 
 describe("isStrokeTool", () => {
     it("treats every tool except fill as a drag tool", () => {
@@ -32,15 +51,16 @@ describe("paintsPerCell", () => {
         expect(paintsPerCell("fill")).toBe(false);
     });
 
-    it("agrees with strokeColor about which tools are stable per stroke", () => {
-        for (const tool of DRAWING_TOOLS) {
-            const colors = new Set(
-                Array.from({ length: 50 }, () => strokeColor(tool, PEN_COLOR))
-            );
+    // A tool that varied its color but was missing here would have one cached
+    // color smeared across a whole drag.
+    it.each(DRAWING_TOOLS)(
+        "agrees with strokeColor about whether %s varies",
+        (tool) => {
+            const [first, second] = twoColors(tool);
 
-            expect(colors.size > 1).toBe(paintsPerCell(tool));
+            expect(first !== second).toBe(paintsPerCell(tool));
         }
-    });
+    );
 });
 
 describe("strokeColor", () => {
@@ -52,12 +72,8 @@ describe("strokeColor", () => {
         expect(strokeColor("eraser", PEN_COLOR)).toBe(BLANK_CELL_COLOR);
     });
 
-    it("varies per call for the colorful pen", () => {
-        const colors = new Set(
-            Array.from({ length: 50 }, () => strokeColor("colorfulPen", PEN_COLOR))
-        );
-
-        expect(colors.size).toBeGreaterThan(1);
+    it("draws a fresh random color per call for the colorful pen", () => {
+        expect(twoColors("colorfulPen")).toEqual(["#400000", "#C00000"]);
     });
 
     it("returns a usable color for every tool", () => {

@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 coverage
+# Failure screenshots from the browser test project
+.vitest
 *.local
 
 # Editor directories and files

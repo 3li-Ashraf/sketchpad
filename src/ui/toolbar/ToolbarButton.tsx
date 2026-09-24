@@ -10,10 +10,9 @@ interface ToolbarButtonProps {
     children: React.ReactNode;
     onClick: () => void;
     /**
-     * Set for tools and toggles, which stay visibly pressed; omit for one-shot
-     * actions, which flash on press through `button.toolbar-control:active`
-     * instead. Omitting it also drops `aria-pressed`, so a one-shot action is
-     * not announced as a toggle.
+     * Set for tools and toggles, which stay pressed; omit for one-shot actions,
+     * which only flash while pressed. Omitting it also drops `aria-pressed`,
+     * so a one-shot action is not announced as a toggle.
      */
     isActive?: boolean;
     isDisabled?: boolean;
@@ -31,7 +30,6 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
             type="button"
             aria-label={label}
             aria-pressed={isActive}
-            data-active={isActive}
             disabled={isDisabled}
             onClick={onClick}
             className="toolbar-control text-xl"

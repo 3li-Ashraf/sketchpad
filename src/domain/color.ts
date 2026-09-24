@@ -1,14 +1,25 @@
 /**
- * @file Conversion between the `#RRGGBB` strings the app holds and the RGB bytes
- * the save format and the PNG export need. Pure: no DOM, no React, no store.
+ * @file Conversion between the `#RRGGBB` strings the app holds and the RGB
+ * bytes files and images need.
  *
- * Every color in the app is an uppercase `#RRGGBB` string, which is what lets
- * colors be compared with `===` rather than parsed. Nothing here enforces that
- * on arriving values; `state/sketchStore` normalizes the one path that can carry
- * another case, the native color input.
+ * Every color in the app is uppercase `#RRGGBB`, so colors compare with `===`.
+ * The one source of another case, the native color input, is normalized by the
+ * store; colors decoded from files come out of `rgbToHex`.
  */
 
-export const normalizeHexColor = (color: string): string => color.toUpperCase();
+const CANONICAL_HEX_COLOR = /^#[0-9A-F]{6}$/;
+const HEX_COLOR = /^#[0-9A-F]{6}$/i;
+
+/** Whether a value is a color in the app's form: `#` and six uppercase digits. */
+export const isHexColor = (value: string): boolean =>
+    CANONICAL_HEX_COLOR.test(value);
+
+/**
+ * Reads `#rrggbb` in either case into the app's form, or null for anything
+ * else, including the three-digit shorthand.
+ */
+export const parseHexColor = (value: string): string | null =>
+    HEX_COLOR.test(value) ? value.toUpperCase() : null;
 
 export const randomHexColor = (): string =>
     `#${Math.floor(Math.random() * 0x1000000)
@@ -17,11 +28,8 @@ export const randomHexColor = (): string =>
         .toUpperCase()}`;
 
 /**
- * Splits a color into its three channels. The argument must be exactly a `#`
- * followed by six hex digits: the channels are read from fixed offsets, and
- * nothing validates the shape, so any other string yields `NaN` channels.
- * Digit case does not matter — `parseInt` accepts either — but the length and
- * the leading `#` do.
+ * Splits a color into its channels, read from fixed offsets. The color must
+ * already be valid; anything else yields `NaN` channels.
  */
 export const hexToRgb = (color: string): [number, number, number] => [
     parseInt(color.slice(1, 3), 16),
@@ -29,14 +37,27 @@ export const hexToRgb = (color: string): [number, number, number] => [
     parseInt(color.slice(5, 7), 16),
 ];
 
-/**
- * Builds a color from three channel bytes. This is the only step between a
- * loaded file and the store, and `loadSketch` does not normalize, so the
- * uppercasing here is what keeps a decoded sketch inside the app-wide
- * convention.
- */
+/** Builds an uppercase color from three channel bytes. */
 export const rgbToHex = (red: number, green: number, blue: number): string =>
     `#${[red, green, blue]
         .map((channel) => channel.toString(16).padStart(2, "0"))
         .join("")
         .toUpperCase()}`;
+
+/** The largest color as a number, `#FFFFFF`. */
+export const MAX_COLOR_NUMBER = 0xffffff;
+
+/**
+ * A color as one number, `0xRRGGBB`, which typed arrays can hold. The color
+ * must already be valid, as for `hexToRgb`.
+ */
+export const hexToNumber = (color: string): number =>
+    parseInt(color.slice(1), 16);
+
+/** Whether a number holds a color: a whole number from 0 to `#FFFFFF`. */
+export const isColorNumber = (value: number): boolean =>
+    Number.isInteger(value) && value >= 0 && value <= MAX_COLOR_NUMBER;
+
+/** The color a number holds; it must pass `isColorNumber`. */
+export const numberToHex = (value: number): string =>
+    `#${value.toString(16).padStart(6, "0").toUpperCase()}`;

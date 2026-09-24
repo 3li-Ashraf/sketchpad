@@ -1,12 +1,19 @@
 /**
- * @file Covers `Canvas` together with `usePaintGestures`: what a press and drag
- * paint, and what the DOM does while they do it.
+ * @file The canvas and `usePaintGestures` under jsdom: what presses and drags
+ * paint, and how little of the DOM a stroke touches. Real layout and real
+ * pointer input are in `Canvas.browser.test`.
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { BLANK_CELL_COLOR } from "../../domain/grid";
-import { paintStroke, store } from "../../test/storeHelpers";
+import {
+    actions,
+    canvasColors,
+    paintStroke,
+    store,
+} from "../../test/storeHelpers";
 import { Canvas } from "./Canvas";
 
 const GRID_SIZE = 8;
@@ -41,7 +48,7 @@ const cellPoint = (row: number, column: number) => ({
     clientY: row * CELL_SIZE + CELL_SIZE / 2,
 });
 
-const surface = () => screen.getByTestId("canvas-surface");
+const surface = () => screen.getByRole("img", { name: /^Canvas/ });
 
 const cells = () => Array.from(surface().children);
 
@@ -49,7 +56,7 @@ const colorAt = (index: number) =>
     (cells()[index] as HTMLElement).style.backgroundColor;
 
 const isBlank = () =>
-    store().colors.every((color) => color === BLANK_CELL_COLOR);
+    canvasColors().every((color) => color === BLANK_CELL_COLOR);
 
 const press = (row: number, column: number, button = 0) =>
     fireEvent.pointerDown(surface(), {
@@ -59,7 +66,10 @@ const press = (row: number, column: number, button = 0) =>
     });
 
 const drag = (row: number, column: number) =>
-    fireEvent.pointerMove(surface(), { pointerId: 1, ...cellPoint(row, column) });
+    fireEvent.pointerMove(surface(), {
+        pointerId: 1,
+        ...cellPoint(row, column),
+    });
 
 const release = () => fireEvent.pointerUp(window, { pointerId: 1 });
 
@@ -91,19 +101,28 @@ const observeCells = (target: Element) => {
                         .filter((record) => record.type === "attributes")
                         .map((record) => record.target)
                 ),
-                structural: records.filter((record) => record.type === "childList")
-                    .length,
+                structural: records.filter(
+                    (record) => record.type === "childList"
+                ).length,
             };
         },
     };
 };
 
 beforeEach(() => {
-    store().setGridSize(GRID_SIZE);
+    actions().setGridSize(GRID_SIZE);
     stubSurfaceRect();
 });
 
 describe("rendering", () => {
+    it("presents the surface as one image named with its size", () => {
+        render(<Canvas />);
+
+        expect(
+            screen.getByRole("img", { name: "Canvas, 8 by 8" })
+        ).toBeInTheDocument();
+    });
+
     it("renders one element per grid cell", () => {
         render(<Canvas />);
 
@@ -113,7 +132,7 @@ describe("rendering", () => {
     it("rebuilds the cells when the grid size changes", () => {
         render(<Canvas />);
 
-        act(() => store().setGridSize(4));
+        act(() => actions().setGridSize(4));
 
         expect(cells()).toHaveLength(16);
     });
@@ -141,7 +160,7 @@ describe("rendering", () => {
 
         expect(surface()).toHaveClass("canvas-surface--lined");
 
-        act(() => store().toggleGridLines());
+        act(() => actions().toggleGridLines());
 
         expect(surface()).not.toHaveClass("canvas-surface--lined");
     });
@@ -166,7 +185,7 @@ describe("render cost", () => {
         render(<Canvas />);
         const observer = observeCells(surface());
 
-        act(() => store().toggleGridLines());
+        act(() => actions().toggleGridLines());
 
         const { styled, structural } = observer.take();
 
@@ -191,7 +210,7 @@ describe("pointer painting", () => {
 
         press(1, 2);
 
-        expect(store().colors[10]).toBe(PEN);
+        expect(canvasColors()[10]).toBe(PEN);
     });
 
     it("interpolates cells across a fast drag", () => {
@@ -200,8 +219,8 @@ describe("pointer painting", () => {
         press(0, 0);
         drag(0, 4);
 
-        expect(store().colors.slice(0, 5)).toEqual(Array(5).fill(PEN));
-        expect(store().colors[5]).toBe(BLANK_CELL_COLOR);
+        expect(canvasColors().slice(0, 5)).toEqual(Array(5).fill(PEN));
+        expect(canvasColors()[5]).toBe(BLANK_CELL_COLOR);
     });
 
     it("commits a whole drag as one undo step", () => {
@@ -211,9 +230,9 @@ describe("pointer painting", () => {
         drag(0, 3);
         release();
 
-        expect(store().undoStack).toHaveLength(1);
+        expect(store().document.undoStack).toHaveLength(1);
 
-        act(() => store().undo());
+        act(() => actions().undo());
 
         expect(isBlank()).toBe(true);
     });
@@ -229,9 +248,9 @@ describe("pointer painting", () => {
         });
         drag(7, 7);
 
-        expect(store().colors[0]).toBe(PEN);
-        expect(store().colors[63]).toBe(PEN);
-        expect(store().colors[9]).toBe(BLANK_CELL_COLOR);
+        expect(canvasColors()[0]).toBe(PEN);
+        expect(canvasColors()[63]).toBe(PEN);
+        expect(canvasColors()[9]).toBe(BLANK_CELL_COLOR);
     });
 
     it("ignores pointer movement that never started on the canvas", () => {
@@ -252,7 +271,7 @@ describe("pointer painting", () => {
             ...cellPoint(4, 4),
         });
 
-        expect(store().colors[36]).toBe(BLANK_CELL_COLOR);
+        expect(canvasColors()[36]).toBe(BLANK_CELL_COLOR);
     });
 
     it("ignores non-primary buttons", () => {
@@ -269,8 +288,8 @@ describe("pointer painting", () => {
         press(0, 0);
         release();
 
-        expect(store().undoStack).toHaveLength(1);
-        expect(store().strokeBaseline).toBeNull();
+        expect(store().document.undoStack).toHaveLength(1);
+        expect(store().document.strokeBaseline).toBeNull();
     });
 
     it("captures the pointer for the stroke and releases it at the end", () => {
@@ -292,15 +311,17 @@ describe("pointer painting", () => {
     });
 
     it("draws even where pointer capture is unavailable", () => {
-        vi.spyOn(Element.prototype, "setPointerCapture").mockImplementation(() => {
-            throw new Error("unsupported");
-        });
+        vi.spyOn(Element.prototype, "setPointerCapture").mockImplementation(
+            () => {
+                throw new Error("unsupported");
+            }
+        );
 
         render(<Canvas />);
 
         press(0, 0);
 
-        expect(store().colors[0]).toBe(PEN);
+        expect(canvasColors()[0]).toBe(PEN);
     });
 
     it("commits the stroke when the gesture is cancelled", () => {
@@ -309,7 +330,7 @@ describe("pointer painting", () => {
         press(0, 0);
         fireEvent.pointerCancel(window, { pointerId: 1 });
 
-        expect(store().undoStack).toHaveLength(1);
+        expect(store().document.undoStack).toHaveLength(1);
     });
 
     it("suppresses the context menu so a right-drag does not interrupt drawing", () => {
@@ -329,8 +350,8 @@ describe("pointer painting", () => {
         drag(0, 2);
         release();
 
-        expect(store().undoStack).toHaveLength(1);
-        expect(store().colors.slice(0, 3)).toEqual(Array(3).fill(PEN));
+        expect(store().document.undoStack).toHaveLength(1);
+        expect(canvasColors().slice(0, 3)).toEqual(Array(3).fill(PEN));
     });
 
     it("paints nothing while the surface has no size yet", () => {
@@ -353,34 +374,34 @@ describe("pointer painting", () => {
         press(1, 1);
 
         expect(isBlank()).toBe(true);
-        expect(store().strokeBaseline).toBeNull();
+        expect(store().document.strokeBaseline).toBeNull();
     });
 
     it("mirrors a pointer stroke across both axes", () => {
         render(<Canvas />);
         act(() => {
-            store().toggleMirrorX();
-            store().toggleMirrorY();
+            actions().toggleSymmetry("topBottom");
+            actions().toggleSymmetry("leftRight");
         });
 
         press(0, 0);
         release();
 
         // The pressed corner and its three reflections, in one undo step.
-        expect([0, 7, 56, 63].map((index) => store().colors[index])).toEqual(
+        expect([0, 7, 56, 63].map((index) => canvasColors()[index])).toEqual(
             Array(4).fill(PEN)
         );
-        expect(store().undoStack).toHaveLength(1);
-        expect(store().undoStack[0]).toHaveLength(4);
+        expect(store().document.undoStack).toHaveLength(1);
+        expect(store().document.undoStack[0]).toHaveLength(4);
     });
 
     it("floods on press when the fill tool is active", () => {
         render(<Canvas />);
-        act(() => store().setTool("fill"));
+        act(() => actions().setTool("fill"));
 
         press(3, 3);
 
-        expect(store().colors.every((color) => color === PEN)).toBe(true);
-        expect(store().undoStack).toHaveLength(1);
+        expect(canvasColors().every((color) => color === PEN)).toBe(true);
+        expect(store().document.undoStack).toHaveLength(1);
     });
 });

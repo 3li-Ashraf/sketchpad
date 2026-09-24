@@ -1,30 +1,33 @@
 /**
- * @file The page title, and the button that opens the toolbar on narrow screens.
- * The open state itself belongs to `App`.
+ * @file The page title, and the button that opens the settings panel on narrow
+ * screens.
  */
 
 import { MdSettings } from "react-icons/md";
 
 interface HeaderProps {
-    ref?: React.Ref<HTMLButtonElement>;
+    toggleRef: React.Ref<HTMLButtonElement>;
+    /** The id of the panel the toggle opens. */
+    toolbarId: string;
     isToolbarOpen: boolean;
     onToggleToolbar: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-    ref,
+    toggleRef,
+    toolbarId,
     isToolbarOpen,
     onToggleToolbar,
 }) => (
-    <header className="relative md:static text-2xl sm:text-4xl lg:text-5xl text-center font-pixeled py-7">
+    <header className="relative py-7 text-center font-pixeled text-2xl sm:text-4xl md:static lg:text-5xl">
         <button
-            ref={ref}
+            ref={toggleRef}
             type="button"
             aria-label="Settings"
+            aria-controls={toolbarId}
             aria-expanded={isToolbarOpen}
-            data-active={isToolbarOpen}
             onClick={onToggleToolbar}
-            className="toolbar-control md:hidden absolute left-[5vw] w-8 h-8 sm:w-10 sm:h-10"
+            className="toolbar-control absolute left-[5vw] h-8 w-8 sm:h-10 sm:w-10 md:hidden"
         >
             <MdSettings
                 className={isToolbarOpen ? "animate-spin" : "animate-spin-slow"}

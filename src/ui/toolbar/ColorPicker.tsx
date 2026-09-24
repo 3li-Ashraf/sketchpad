@@ -8,11 +8,13 @@ interface ColorPickerProps {
 }
 
 /**
- * The native color input, hidden behind a swatch showing the current pen color.
- * The input is transparent rather than `display: none`, so it stays interactive
- * and clicking or focusing the swatch opens the platform picker.
+ * The native color input behind a swatch of the current color. It is
+ * transparent rather than `display: none`, so it stays clickable and focusable.
  */
-export const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange }) => (
+export const ColorPicker: React.FC<ColorPickerProps> = ({
+    color,
+    onChange,
+}) => (
     <Tooltip label="Color">
         <label
             style={{ backgroundColor: color }}
@@ -22,7 +24,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange }) => 
                 type="color"
                 aria-label="Color"
                 value={color}
-                className="opacity-0 w-9 h-9 cursor-pointer"
+                className="h-9 w-9 cursor-pointer opacity-0"
                 onChange={(event) => onChange(event.target.value)}
             />
         </label>

@@ -1,6 +1,7 @@
-/** @file The grid size control: a restyled native range input and its caption. */
+/** @file The grid size slider: a restyled native range input and its caption. */
 
 import { useRef } from "react";
+
 import { MAX_GRID_SIZE, MIN_GRID_SIZE } from "../../domain/grid";
 
 interface GridSizeSliderProps {
@@ -25,20 +26,15 @@ const keyMovesSlider = (key: string, gridSize: number): boolean =>
     (LOWERING_KEYS.has(key) && gridSize > MIN_GRID_SIZE);
 
 /**
- * A native range input, so it is keyboard operable and exposes the slider role
- * and its range without any code. Its track and thumb are restyled in
- * `.grid-size-slider`; how far along the track the fill runs is the one thing CSS
- * cannot work out on its own, so it is handed over as a 0..1 ratio.
+ * A native range input, so keyboard use and the slider role come for free;
+ * `.grid-size-slider` restyles it, and the fill's extent is passed in as a 0..1
+ * ratio because CSS cannot compute it. The caption is hidden from screen
+ * readers, which hear `aria-valuetext` ("32 by 32") instead.
  *
- * The visible caption is hidden from assistive technology and the slider carries
- * the same value as `aria-valuetext`, so the size is announced once, as "32 by
- * 32" rather than as a bare number.
- *
- * Locked, the input ignores the pointer, so a press cannot start a drag that the
- * browser would carry on with underneath a dialog. The press lands on the track
- * around it instead, and a key that would step the slider is caught before it
- * does; either is reported through `onBeforeChange`, and moves nothing unless the
- * answer lets it.
+ * Locked, the input ignores the pointer, so a press cannot start a drag the
+ * browser would continue beneath a dialog. The press lands on the track
+ * instead, and a key that would step it is caught first; both go through
+ * `onBeforeChange`.
  */
 export const GridSizeSlider: React.FC<GridSizeSliderProps> = ({
     gridSize,
@@ -51,10 +47,8 @@ export const GridSizeSlider: React.FC<GridSizeSliderProps> = ({
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         if (event.button !== 0 || onBeforeChange()) return;
 
-        // Prevented so the press does not go on to move focus to wherever the
-        // pointer came down, which under the dialog it has just opened is not
-        // the dialog. The slider takes focus, as it would for a press it had
-        // handled itself, so closing the dialog hands focus back to it.
+        // Prevented so the press does not move focus to wherever it landed.
+        // The slider takes focus instead, so closing the dialog returns it here.
         event.preventDefault();
         inputRef.current!.focus();
     };
@@ -67,8 +61,8 @@ export const GridSizeSlider: React.FC<GridSizeSliderProps> = ({
 
     return (
         <div className="flex flex-col gap-3">
-            <p className="text-lg text-center font-pixeled" aria-hidden="true">
-                {gridSize} X {gridSize}
+            <p className="text-center font-pixeled text-lg" aria-hidden="true">
+                {gridSize} × {gridSize}
             </p>
             <div
                 className="grid-size-track flex cursor-pointer"
@@ -85,7 +79,7 @@ export const GridSizeSlider: React.FC<GridSizeSliderProps> = ({
                     value={gridSize}
                     onChange={(event) => onChange(event.target.valueAsNumber)}
                     onKeyDown={handleKeyDown}
-                    className={`grid-size-slider${isLocked ? " pointer-events-none" : ""}`}
+                    className={`grid-size-slider ${isLocked ? "pointer-events-none" : ""}`}
                     style={
                         {
                             "--slider-progress":

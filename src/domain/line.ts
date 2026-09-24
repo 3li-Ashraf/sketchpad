@@ -1,7 +1,4 @@
-/**
- * @file Bresenham line tracing between two cells. Pure: no DOM, no React, no
- * store.
- */
+/** @file Bresenham line tracing between two cells. */
 
 import type { CellPosition } from "./grid";
 

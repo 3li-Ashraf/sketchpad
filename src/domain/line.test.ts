@@ -1,9 +1,5 @@
-/**
- * @file Covers `domain/line`: that a traced line is connected and hits both
- * endpoints.
- */
-
 import { describe, expect, it } from "vitest";
+
 import type { CellPosition } from "./grid";
 import { traceLine } from "./line";
 
@@ -58,10 +54,22 @@ describe("traceLine", () => {
 
     it("visits both endpoints and never jumps, whatever the slope", () => {
         const endpoints: [CellPosition, CellPosition][] = [
-            [{ row: 0, column: 0 }, { row: 2, column: 7 }],
-            [{ row: 5, column: 1 }, { row: 0, column: 9 }],
-            [{ row: 9, column: 9 }, { row: 0, column: 4 }],
-            [{ row: 3, column: 8 }, { row: 8, column: 0 }],
+            [
+                { row: 0, column: 0 },
+                { row: 2, column: 7 },
+            ],
+            [
+                { row: 5, column: 1 },
+                { row: 0, column: 9 },
+            ],
+            [
+                { row: 9, column: 9 },
+                { row: 0, column: 4 },
+            ],
+            [
+                { row: 3, column: 8 },
+                { row: 8, column: 0 },
+            ],
         ];
 
         for (const [from, to] of endpoints) {
@@ -71,7 +79,9 @@ describe("traceLine", () => {
             expect(visited.at(-1)).toEqual(to);
 
             for (let step = 1; step < visited.length; step++) {
-                const rowStep = Math.abs(visited[step].row - visited[step - 1].row);
+                const rowStep = Math.abs(
+                    visited[step].row - visited[step - 1].row
+                );
                 const columnStep = Math.abs(
                     visited[step].column - visited[step - 1].column
                 );
@@ -83,7 +93,9 @@ describe("traceLine", () => {
 
     it("never revisits a cell", () => {
         const visited = trace({ row: 5, column: 1 }, { row: 0, column: 9 });
-        const unique = new Set(visited.map(({ row, column }) => `${row},${column}`));
+        const unique = new Set(
+            visited.map(({ row, column }) => `${row},${column}`)
+        );
 
         expect(unique.size).toBe(visited.length);
     });

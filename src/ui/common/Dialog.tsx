@@ -38,28 +38,20 @@ interface ModalDialogProps {
     children: React.ReactNode;
 }
 
-// The toolbar's bordered control, stretched to fit a label instead of an icon.
-// Every dialog button looks the same and is painted only under the pointer.
-// Tailwind's `hover:` variant applies only on devices that can hover, so a tap
-// on a touch screen does not leave the button it landed on painted.
-const DIALOG_BUTTON =
+// The toolbar's control stretched to fit a label. Both buttons look alike,
+// so neither reads as the default, and `hover:` applies only on devices that
+// can hover, so a tap does not leave a button painted.
+export const TEXT_BUTTON =
     "toolbar-control w-auto h-auto px-4 py-2 text-sm font-medium hover:bg-accent hover:text-surface";
 
 /**
- * Open for exactly as long as it is mounted, so whether a dialog is up is
- * decided by whoever renders it and the element can never disagree with React.
+ * Open exactly while mounted, so the element can never disagree with React.
+ * `showModal` gives the top layer, an inert page behind, and Escape as a
+ * `cancel` event for free.
  *
- * `showModal` rather than a styled overlay, because the browser then does the
- * hard parts: the dialog is drawn in the top layer above everything, the rest of
- * the page is made inert so the canvas cannot be painted behind it, focus stays
- * inside, and Escape arrives as a `cancel` event.
- *
- * Portalled to the body so it is never inside the toolbar, which is
- * `display: none` while collapsed on a narrow screen. A dialog in there that
- * opened after the panel closed — a save failing a moment after a tap outside
- * it — would be modal but invisible, leaving an inert page with nothing to
- * dismiss. `App` counts a press inside a dialog as a press inside the toolbar
- * for the same reason.
+ * Portalled to the body because the settings panel is `display: none` while
+ * collapsed, and a modal inside it would leave an inert page with nothing
+ * visible to dismiss.
  */
 const ModalDialog: React.FC<ModalDialogProps> = ({
     title,
@@ -71,19 +63,14 @@ const ModalDialog: React.FC<ModalDialogProps> = ({
     const titleId = useId();
     const messageId = useId();
 
-    // A layout effect, so the dialog is open before the first paint instead of
-    // flashing closed for a frame, and is closed again before React takes it out
-    // of the document on the way out.
+    // A layout effect, so the dialog is open before the first paint rather
+    // than flashing closed for a frame.
     useLayoutEffect(() => {
         const dialog = dialogRef.current!;
 
         dialog.showModal();
-        // `showModal` focuses the first control on its own — the checkbox in a
-        // confirmation, the first button in a notice. Focus moves to the dialog
-        // itself instead, so no control starts focused and Enter presses
-        // nothing until one is chosen, while Tab still reaches every control
-        // and Escape still cancels. The move happens before the browser paints,
-        // so the first control is never drawn focused.
+        // `showModal` focuses the first control; the dialog takes focus
+        // instead, so Enter presses nothing until a control is chosen.
         dialog.focus();
 
         return () => dialog.close();
@@ -95,24 +82,21 @@ const ModalDialog: React.FC<ModalDialogProps> = ({
             role="alertdialog"
             aria-labelledby={titleId}
             aria-describedby={messageId}
-            // Focusable, so it can hold focus itself, but kept out of the tab
-            // order, so Tab goes straight to the controls.
+            // Focusable, but out of the tab order.
             tabIndex={-1}
             // Escape. Prevented so the element stays open until React unmounts
-            // it, rather than closing itself a render ahead of the state that
-            // says so.
+            // it. When it cannot be (Escape with no user activation to spend),
+            // the browser closes the dialog and `onClose` reports it instead,
+            // so either way it is reported once.
             onCancel={(event) => {
+                if (!event.cancelable) return;
+
                 event.preventDefault();
                 onDismiss();
             }}
-            // The browser can close the dialog without asking all the same:
-            // Escape grants no user activation, and without one to spend,
-            // `cancel` is not cancelable. Unheard, that would leave a closed
-            // dialog mounted — invisible, and never shown again, since it opens
-            // only on mount. `close` is queued rather than fired at once, so the
-            // one this component's own cleanup causes can arrive after a
-            // StrictMode remount has opened the dialog again, which is why an
-            // open dialog ignores it.
+            // A close nobody asked for. `close` is queued, so the one this
+            // component's own cleanup causes can arrive after a StrictMode
+            // remount has reopened the dialog; an open dialog ignores it.
             onClose={(event) => {
                 if (!event.currentTarget.open) onDismiss();
             }}
@@ -148,23 +132,27 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
     return (
         <ModalDialog title={title} message={message} onDismiss={onCancel}>
-            <label className="mt-5 flex w-fit items-center gap-2 text-sm cursor-pointer">
+            <label className="mt-5 flex w-fit cursor-pointer items-center gap-2 text-sm">
                 <input
                     type="checkbox"
                     checked={dontAskAgain}
                     onChange={(event) => setDontAskAgain(event.target.checked)}
-                    className="size-4 accent-accent cursor-pointer"
+                    className="size-4 cursor-pointer accent-accent"
                 />
                 Don't ask again
             </label>
             <div className="mt-6 flex flex-wrap justify-end gap-3">
-                <button type="button" onClick={onCancel} className={DIALOG_BUTTON}>
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    className={TEXT_BUTTON}
+                >
                     Cancel
                 </button>
                 <button
                     type="button"
                     onClick={() => onConfirm(dontAskAgain)}
-                    className={DIALOG_BUTTON}
+                    className={TEXT_BUTTON}
                 >
                     {confirmLabel}
                 </button>
@@ -183,10 +171,10 @@ export const NoticeDialog: React.FC<NoticeDialogProps> = ({
 }) => (
     <ModalDialog title={title} message={message} onDismiss={onDismiss}>
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-            <button type="button" onClick={onDismiss} className={DIALOG_BUTTON}>
+            <button type="button" onClick={onDismiss} className={TEXT_BUTTON}>
                 {dismissLabel}
             </button>
-            <button type="button" onClick={onAction} className={DIALOG_BUTTON}>
+            <button type="button" onClick={onAction} className={TEXT_BUTTON}>
                 {actionLabel}
             </button>
         </div>

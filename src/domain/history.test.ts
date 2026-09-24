@@ -1,16 +1,12 @@
-/**
- * @file Covers `domain/history`: diffing, the entry cap, and stepping either
- * way.
- */
-
 import { describe, expect, it } from "vitest";
+
 import {
     appendEntry,
     diffColors,
+    type HistoryEntry,
     MAX_HISTORY_ENTRIES,
     reapplyEntry,
     revertEntry,
-    type HistoryEntry,
 } from "./history";
 
 const entryOf = (index: number): HistoryEntry => [
@@ -90,7 +86,7 @@ describe("revertEntry and reapplyEntry", () => {
 });
 
 describe("a diff and its inverse", () => {
-    it("round-trips any pair of grids", () => {
+    it("reapply to the new grid and revert to the old", () => {
         const before = ["#000000", "#111111", "#222222", "#333333"];
         const after = ["#000000", "#AAAAAA", "#222222", "#BBBBBB"];
 

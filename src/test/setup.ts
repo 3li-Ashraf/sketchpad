@@ -1,19 +1,12 @@
 /**
- * @file Runs before every test file: installs the jest-dom matchers, the pointer
- * capture and dialog stubs, and the per-test cleanup. Spies and stubbed globals
- * are undone by `restoreMocks` and `unstubGlobals` in the Vitest config instead.
+ * @file Runs before every test file in every project: each test starts from
+ * the store's initial state, and fails if it logs anything it did not expect.
  */
 
-import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
-import { installDialog, installPointerCapture } from "./browserStubs";
+
+import { watchLogs } from "./logCapture";
 import { resetSketchStore } from "./storeHelpers";
 
-installPointerCapture();
-installDialog();
-
-afterEach(() => {
-    cleanup();
-    resetSketchStore();
-});
+afterEach(resetSketchStore);
+watchLogs();

@@ -1,604 +1,333 @@
 /**
- * @file Covers `state/sketchStore`: the stroke protocol, mirroring, fill, the
- * history stacks and loading. The store is a module singleton, so `src/test/setup`
- * resets it between tests and `storeHelpers` drives it the way the UI would.
+ * @file The store's own job: its defaults, its settings, the brush it hands the
+ * document edits, and skipping updates that change nothing. The editing rules
+ * themselves are covered in `domain/sketchDocument.test`.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
 import {
     BLANK_CELL_COLOR,
     createBlankGrid,
     DEFAULT_GRID_SIZE,
-    MAX_GRID_SIZE,
-    MIN_GRID_SIZE,
+    NO_SYMMETRY,
 } from "../domain/grid";
-import { MAX_HISTORY_ENTRIES } from "../domain/history";
 import { DEFAULT_PEN_COLOR, DEFAULT_TOOL } from "../domain/tools";
-import { paintStroke, store, switchToGridSize } from "../test/storeHelpers";
+import { expectInvalidInput } from "../test/logCapture";
+import {
+    actions,
+    canvasColors,
+    paintStroke,
+    resetSketchStore,
+    store,
+} from "../test/storeHelpers";
 import {
     selectCanRedo,
     selectCanUndo,
     selectHasWorkToLose,
     selectSketch,
+    selectWorkspace,
+    useSketchStore,
 } from "./sketchStore";
 
-const PEN_COLOR = "#123456";
-
-const isBlank = () => store().colors.every((color) => color === BLANK_CELL_COLOR);
+const PEN = "#123456";
 
 describe("initial state", () => {
-    it("starts on a blank default grid with the default tool and no history", () => {
-        expect(store().gridSize).toBe(DEFAULT_GRID_SIZE);
-        expect(store().colors).toHaveLength(DEFAULT_GRID_SIZE * DEFAULT_GRID_SIZE);
-        expect(isBlank()).toBe(true);
-        expect(store().penColor).toBe(DEFAULT_PEN_COLOR);
+    it("is a blank default grid with the default tool and nothing to undo", () => {
+        expect(store().document.gridSize).toBe(DEFAULT_GRID_SIZE);
+        expect(canvasColors()).toEqual(createBlankGrid(DEFAULT_GRID_SIZE));
         expect(store().tool).toBe(DEFAULT_TOOL);
-        expect(store().mirrorX).toBe(false);
-        expect(store().mirrorY).toBe(false);
+        expect(store().penColor).toBe(DEFAULT_PEN_COLOR);
+        expect(store().symmetry).toEqual(NO_SYMMETRY);
         expect(store().showGridLines).toBe(true);
+        expect(store().askBeforeResize).toBe(true);
+        expect(store().askBeforeReplace).toBe(true);
+        expect(store().askBeforeNewSketch).toBe(true);
         expect(selectCanUndo(store())).toBe(false);
         expect(selectCanRedo(store())).toBe(false);
     });
 });
 
 describe("settings", () => {
-    it("normalizes the pen color to uppercase", () => {
-        store().setPenColor("#3ea6ff");
+    it("uppercases the pen color the native input reports", () => {
+        actions().setPenColor("#3ea6ff");
 
         expect(store().penColor).toBe("#3EA6FF");
     });
 
-    it("switches the active tool", () => {
-        store().setTool("eraser");
+    it.each(["red", "#fff", "", "#3EA6FF80"])(
+        "keeps the pen color when given %j, and reports it",
+        (color) => {
+            actions().setPenColor(color);
+
+            expect(store().penColor).toBe(DEFAULT_PEN_COLOR);
+            expectInvalidInput("setPenColor");
+        }
+    );
+
+    it("switches the tool", () => {
+        actions().setTool("eraser");
 
         expect(store().tool).toBe("eraser");
     });
 
-    it("toggles mirroring and grid lines independently", () => {
-        store().toggleMirrorX();
+    it("toggles each symmetry on its own", () => {
+        actions().toggleSymmetry("topBottom");
+        expect(store().symmetry).toEqual({ topBottom: true, leftRight: false });
 
-        expect(store().mirrorX).toBe(true);
-        expect(store().mirrorY).toBe(false);
-        expect(store().showGridLines).toBe(true);
+        actions().toggleSymmetry("leftRight");
+        actions().toggleSymmetry("topBottom");
+        expect(store().symmetry).toEqual({ topBottom: false, leftRight: true });
+    });
 
-        store().toggleMirrorY();
-        store().toggleGridLines();
+    it("toggles grid lines", () => {
+        actions().toggleGridLines();
 
-        expect(store().mirrorY).toBe(true);
         expect(store().showGridLines).toBe(false);
     });
+
+    it("stops asking each question independently, for the visit", () => {
+        actions().stopAskingBeforeResize();
+        expect(store().askBeforeResize).toBe(false);
+        expect(store().askBeforeReplace).toBe(true);
+        expect(store().askBeforeNewSketch).toBe(true);
+
+        actions().stopAskingBeforeReplace();
+        expect(store().askBeforeNewSketch).toBe(true);
+
+        actions().stopAskingBeforeNewSketch();
+        actions().setGridSize(8);
+        actions().loadSketch({ gridSize: 4, colors: createBlankGrid(4) });
+        actions().startNewSketch();
+
+        expect(store().askBeforeResize).toBe(false);
+        expect(store().askBeforeReplace).toBe(false);
+        expect(store().askBeforeNewSketch).toBe(false);
+    });
 });
 
-describe("setGridSize", () => {
-    it("resizes to a blank canvas and drops the history", () => {
-        paintStroke(0);
-        store().setGridSize(8);
+describe("edits", () => {
+    it("paint with the current tool, pen color and symmetry", () => {
+        actions().setGridSize(4);
+        actions().setPenColor(PEN);
+        actions().toggleSymmetry("leftRight");
 
-        expect(store().gridSize).toBe(8);
-        expect(store().colors).toHaveLength(64);
-        expect(isBlank()).toBe(true);
-        expect(selectCanUndo(store())).toBe(false);
-    });
+        paintStroke(5);
 
-    it("clamps to the supported range", () => {
-        store().setGridSize(999);
-        expect(store().gridSize).toBe(MAX_GRID_SIZE);
-
-        store().setGridSize(-4);
-        expect(store().gridSize).toBe(MIN_GRID_SIZE);
-    });
-
-    it("keeps the drawing when the size does not actually change", () => {
-        paintStroke(0);
-        const colors = store().colors;
-
-        store().setGridSize(DEFAULT_GRID_SIZE);
-
-        expect(store().colors).toBe(colors);
+        expect([5, 6].map((index) => canvasColors()[index])).toEqual([
+            PEN,
+            PEN,
+        ]);
         expect(selectCanUndo(store())).toBe(true);
     });
-});
 
-describe("strokes", () => {
-    it("paints the cells of a stroke with the pen color", () => {
-        store().setPenColor(PEN_COLOR);
-        paintStroke(0, 1, 2);
+    it("fill with the pen color, ignoring symmetry", () => {
+        actions().setGridSize(3);
+        paintStroke(1, 4, 7);
+        actions().setPenColor(PEN);
+        actions().toggleSymmetry("leftRight");
 
-        expect(store().colors.slice(0, 3)).toEqual([PEN_COLOR, PEN_COLOR, PEN_COLOR]);
+        actions().fillFrom(0);
+
+        expect([0, 2].map((index) => canvasColors()[index])).toEqual([
+            PEN,
+            BLANK_CELL_COLOR,
+        ]);
     });
 
-    it("records one undo step per stroke, not per cell", () => {
-        paintStroke(0, 1, 2);
+    it("clear, undo and redo the canvas", () => {
+        paintStroke(0);
+        actions().clearCanvas();
+        expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
 
-        expect(store().undoStack).toHaveLength(1);
-        expect(store().undoStack[0]).toHaveLength(3);
+        actions().undo();
+        expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
+
+        actions().redo();
+        expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
+        expect(selectCanRedo(store())).toBe(false);
     });
 
-    it("ignores paint calls outside a stroke", () => {
-        store().paintCells([0]);
+    it("start a new sketch at the same size, keeping the settings", () => {
+        actions().setGridSize(8);
+        paintStroke(0);
+        actions().setTool("eraser");
+        actions().toggleSymmetry("leftRight");
 
-        expect(store().colors[0]).toBe(BLANK_CELL_COLOR);
+        actions().startNewSketch();
+
+        expect(canvasColors()).toEqual(createBlankGrid(8));
         expect(selectCanUndo(store())).toBe(false);
+        expect(store().tool).toBe("eraser");
+        expect(store().symmetry.leftRight).toBe(true);
     });
 
-    it("ignores an empty stroke", () => {
-        paintStroke();
+    it("rotate the drawing a quarter turn clockwise", () => {
+        actions().setGridSize(2);
+        paintStroke(0);
 
-        expect(isBlank()).toBe(true);
-        expect(selectCanUndo(store())).toBe(false);
-    });
+        actions().rotateCanvas();
 
-    it("ignores cell indices outside the grid", () => {
-        switchToGridSize(2);
-        paintStroke(-1, 99, 0);
-
-        expect(store().colors).toEqual([
+        expect(canvasColors()).toEqual([
+            BLANK_CELL_COLOR,
             DEFAULT_PEN_COLOR,
             BLANK_CELL_COLOR,
             BLANK_CELL_COLOR,
-            BLANK_CELL_COLOR,
         ]);
     });
 
-    it("erases to blank", () => {
-        store().setPenColor(PEN_COLOR);
+    it("load a sketch in place of the document", () => {
         paintStroke(0);
+        const colors = createBlankGrid(2);
+        colors[3] = PEN;
 
-        store().setTool("eraser");
-        paintStroke(0);
+        actions().loadSketch({ gridSize: 2, colors });
 
-        expect(store().colors[0]).toBe(BLANK_CELL_COLOR);
-    });
-
-    it("gives the colorful pen a different color per cell", () => {
-        switchToGridSize(16);
-        store().setTool("colorfulPen");
-        paintStroke(...Array.from({ length: 64 }, (_, index) => index));
-
-        expect(new Set(store().colors.slice(0, 64)).size).toBeGreaterThan(1);
-    });
-
-    it("does not paint with the fill tool", () => {
-        store().setTool("fill");
-        paintStroke(0);
-
-        expect(store().colors[0]).toBe(BLANK_CELL_COLOR);
-    });
-
-    it("records nothing when a stroke changes no cell", () => {
-        store().setPenColor(BLANK_CELL_COLOR);
-        paintStroke(0, 1);
-
+        expect(selectSketch(store())).toEqual({ gridSize: 2, colors });
         expect(selectCanUndo(store())).toBe(false);
     });
 
-    it("records nothing when a stroke ends on the colors it started with", () => {
-        store().setPenColor(PEN_COLOR);
-        paintStroke(0);
+    it.each([
+        ["undo with nothing to undo", () => actions().undo()],
+        ["paint outside a stroke", () => actions().paintCells([0])],
+        [
+            "resize to the current size",
+            () => actions().setGridSize(DEFAULT_GRID_SIZE),
+        ],
+        ["clear a blank canvas", () => actions().clearCanvas()],
+        ["rotate a blank canvas", () => actions().rotateCanvas()],
+        ["start over with nothing to lose", () => actions().startNewSketch()],
+    ])("notify no one when they change nothing: %s", (_, edit) => {
+        const listener = vi.fn();
+        const unsubscribe = useSketchStore.subscribe(listener);
 
-        store().beginStroke();
-        store().setTool("eraser");
-        store().paintCells([0]);
-        store().setTool("pen");
-        store().paintCells([0]);
-        store().endStroke();
+        edit();
+        unsubscribe();
 
-        expect(store().colors[0]).toBe(PEN_COLOR);
-        expect(store().undoStack).toHaveLength(1);
+        expect(listener).not.toHaveBeenCalled();
     });
 
-    it("keeps the same colors array when a stroke repaints what is already there", () => {
-        // Array identity is the contract the memoized cells rely on, so `toBe`
-        // here is load-bearing: `toEqual` would still pass if the store started
-        // copying the grid on every pointer move.
-        store().setPenColor(PEN_COLOR);
-        paintStroke(0);
+    it.each([
+        [
+            "a size that is not a number",
+            "resizeDocument",
+            () => actions().setGridSize(Number.NaN),
+        ],
+        [
+            "a pen color that is not a color",
+            "setPenColor",
+            () => actions().setPenColor("red"),
+        ],
+        [
+            "a sketch that does not hold together",
+            "openDocument",
+            () =>
+                actions().loadSketch({
+                    gridSize: 4,
+                    colors: createBlankGrid(2),
+                }),
+        ],
+    ])(
+        "refuse %s without notifying anyone, and report it",
+        (_, where, edit) => {
+            const listener = vi.fn();
+            const unsubscribe = useSketchStore.subscribe(listener);
 
-        const colors = store().colors;
-        store().beginStroke();
-        store().paintCells([0]);
+            edit();
+            unsubscribe();
 
-        expect(store().colors).toBe(colors);
-    });
-
-    it("skips cells that already carry the stroke color", () => {
-        switchToGridSize(4);
-        store().setPenColor(PEN_COLOR);
-        paintStroke(1);
-
-        paintStroke(0, 1);
-
-        expect(store().undoStack[1]).toHaveLength(1);
-        expect(store().undoStack[1][0].index).toBe(0);
-    });
-
-    it("caps the history at the retained number of strokes", () => {
-        switchToGridSize(64);
-
-        for (let index = 0; index <= MAX_HISTORY_ENTRIES; index++) {
-            paintStroke(index);
+            expect(listener).not.toHaveBeenCalled();
+            expectInvalidInput(where);
         }
-
-        expect(store().undoStack).toHaveLength(MAX_HISTORY_ENTRIES);
-    });
-
-    it("ends a stroke that was never begun without recording anything", () => {
-        store().endStroke();
-
-        expect(selectCanUndo(store())).toBe(false);
-        expect(store().strokeBaseline).toBeNull();
-    });
+    );
 });
 
-describe("mirroring", () => {
-    it("mirrors a stroke across the horizontal axis", () => {
-        switchToGridSize(4);
-        store().setPenColor(PEN_COLOR);
-        store().toggleMirrorX();
+describe("restoring a workspace", () => {
+    const saved = () => {
+        actions().setGridSize(4);
+        paintStroke(0);
+        actions().setTool("eraser");
+        actions().toggleGridLines();
+        const workspace = selectWorkspace(store());
+        resetSketchStore();
 
-        paintStroke(5);
-
-        expect(store().colors[5]).toBe(PEN_COLOR);
-        expect(store().colors[9]).toBe(PEN_COLOR);
-    });
-
-    it("mirrors a stroke across the vertical axis", () => {
-        switchToGridSize(4);
-        store().setPenColor(PEN_COLOR);
-        store().toggleMirrorY();
-
-        paintStroke(5);
-
-        expect(store().colors[6]).toBe(PEN_COLOR);
-    });
-
-    it("paints all four reflections when both axes mirror", () => {
-        switchToGridSize(4);
-        store().setPenColor(PEN_COLOR);
-        store().toggleMirrorX();
-        store().toggleMirrorY();
-
-        paintStroke(5);
-
-        expect([5, 6, 9, 10].map((index) => store().colors[index])).toEqual([
-            PEN_COLOR,
-            PEN_COLOR,
-            PEN_COLOR,
-            PEN_COLOR,
-        ]);
-        expect(store().undoStack[0]).toHaveLength(4);
-    });
-
-    it("records a cell on an axis of symmetry once", () => {
-        switchToGridSize(3);
-        store().setPenColor(PEN_COLOR);
-        store().toggleMirrorX();
-        store().toggleMirrorY();
-
-        paintStroke(4);
-
-        expect(store().undoStack[0]).toHaveLength(1);
-    });
-});
-
-describe("fill", () => {
-    it("floods the contiguous region of matching cells", () => {
-        switchToGridSize(3);
-        store().setPenColor(PEN_COLOR);
-        store().fillFrom(4);
-
-        expect(store().colors.every((color) => color === PEN_COLOR)).toBe(true);
-        expect(store().undoStack).toHaveLength(1);
-    });
-
-    it("stops at cells of a different color", () => {
-        switchToGridSize(3);
-        paintStroke(1, 4, 7);
-
-        store().setPenColor(PEN_COLOR);
-        store().fillFrom(0);
-
-        expect([0, 3, 6].map((index) => store().colors[index])).toEqual([
-            PEN_COLOR,
-            PEN_COLOR,
-            PEN_COLOR,
-        ]);
-        expect([2, 5, 8].map((index) => store().colors[index])).toEqual([
-            BLANK_CELL_COLOR,
-            BLANK_CELL_COLOR,
-            BLANK_CELL_COLOR,
-        ]);
-    });
-
-    it("ignores mirroring, flooding exactly the region that was clicked", () => {
-        switchToGridSize(3);
-        paintStroke(1, 4, 7);
-        store().toggleMirrorY();
-
-        store().setPenColor(PEN_COLOR);
-        store().fillFrom(0);
-
-        expect(store().colors[2]).toBe(BLANK_CELL_COLOR);
-    });
-
-    it("does nothing when the target already has the fill color", () => {
-        switchToGridSize(3);
-        store().setPenColor(BLANK_CELL_COLOR);
-        store().fillFrom(0);
-
-        expect(selectCanUndo(store())).toBe(false);
-    });
-
-    it("ignores an out-of-range index", () => {
-        switchToGridSize(3);
-        store().fillFrom(99);
-        store().fillFrom(-1);
-
-        expect(selectCanUndo(store())).toBe(false);
-    });
-});
-
-describe("clearGrid", () => {
-    it("blanks every cell in one undoable step", () => {
-        store().setPenColor(PEN_COLOR);
-        paintStroke(0, 1);
-
-        store().clearGrid();
-
-        expect(isBlank()).toBe(true);
-        expect(store().undoStack).toHaveLength(2);
-
-        store().undo();
-
-        expect(store().colors.slice(0, 2)).toEqual([PEN_COLOR, PEN_COLOR]);
-    });
-
-    it("does nothing on an already blank canvas", () => {
-        store().clearGrid();
-
-        expect(selectCanUndo(store())).toBe(false);
-    });
-});
-
-describe("actions that write history while a stroke is open", () => {
-    // Reachable with two fingers: one drawing on the canvas, the other pressing
-    // a toolbar button. Each of these actions records an entry of its own, and
-    // doing that under a live baseline corrupts the history twice over — the
-    // entry's `before` colors come from a grid no committed state ever held, and
-    // `endStroke` then diffs across the same cells and records them again.
-    const openStroke = () => {
-        store().setPenColor(PEN_COLOR);
-        store().beginStroke();
-        store().paintCells([0]);
+        return workspace;
     };
 
-    it("refuses a clear, leaving the stroke to commit on its own", () => {
-        switchToGridSize(3);
-        openStroke();
+    it("puts back the drawing, its history and the settings", () => {
+        const workspace = saved();
 
-        store().clearGrid();
+        actions().restoreWorkspace(workspace);
 
-        expect(store().colors[0]).toBe(PEN_COLOR);
-        expect(store().undoStack).toHaveLength(0);
-
-        store().endStroke();
-
-        expect(store().undoStack).toHaveLength(1);
-        expect(store().undoStack[0]).toEqual([
-            { index: 0, before: BLANK_CELL_COLOR, after: PEN_COLOR },
-        ]);
-    });
-
-    it("refuses a fill, so no cell lands in two entries at once", () => {
-        switchToGridSize(2);
-        openStroke();
-
-        store().fillFrom(1);
-        store().endStroke();
-
-        expect(store().undoStack).toHaveLength(1);
-        expect(store().colors[1]).toBe(BLANK_CELL_COLOR);
-    });
-
-    it("undoes back to blank in one step after a refused clear", () => {
-        // The regression this pins: before the guard, the clear's entry was the
-        // only one recorded, and undoing it painted cell 0 a color the committed
-        // history never held — leaving the canvas dirtier than it started.
-        switchToGridSize(3);
-        openStroke();
-        store().clearGrid();
-        store().endStroke();
-
-        store().undo();
-
-        expect(isBlank()).toBe(true);
-        expect(selectCanUndo(store())).toBe(false);
-    });
-
-    it("accepts both again once the stroke is committed", () => {
-        switchToGridSize(3);
-        openStroke();
-        store().endStroke();
-
-        store().fillFrom(1);
-        store().clearGrid();
-
-        expect(isBlank()).toBe(true);
-        expect(store().undoStack).toHaveLength(3);
-    });
-});
-
-describe("undo and redo", () => {
-    it("steps backwards and forwards through strokes", () => {
-        store().setPenColor("#111111");
-        paintStroke(0);
-        store().setPenColor("#222222");
-        paintStroke(1);
-
-        store().undo();
-        expect(store().colors.slice(0, 2)).toEqual(["#111111", BLANK_CELL_COLOR]);
-
-        store().undo();
-        expect(store().colors.slice(0, 2)).toEqual([
-            BLANK_CELL_COLOR,
-            BLANK_CELL_COLOR,
-        ]);
-
-        store().redo();
-        store().redo();
-        expect(store().colors.slice(0, 2)).toEqual(["#111111", "#222222"]);
-    });
-
-    it("restores the color a cell had before the stroke, not blank", () => {
-        store().setPenColor("#111111");
-        paintStroke(0);
-        store().setPenColor("#222222");
-        paintStroke(0);
-
-        store().undo();
-
-        expect(store().colors[0]).toBe("#111111");
-    });
-
-    it("drops the redo stack once a new stroke is drawn", () => {
-        paintStroke(0);
-        store().undo();
-        expect(selectCanRedo(store())).toBe(true);
-
-        paintStroke(1);
-
-        expect(selectCanRedo(store())).toBe(false);
-    });
-
-    it("does nothing when there is no history", () => {
-        store().undo();
-        store().redo();
-
-        expect(isBlank()).toBe(true);
-    });
-
-    it("is ignored while a stroke is in progress", () => {
-        paintStroke(0);
-
-        store().beginStroke();
-        store().undo();
-        store().redo();
-
-        expect(store().colors[0]).toBe(DEFAULT_PEN_COLOR);
+        expect(selectWorkspace(store())).toEqual(workspace);
         expect(selectCanUndo(store())).toBe(true);
     });
-});
 
-describe("loadSketch", () => {
-    it("replaces the canvas and clears the history", () => {
-        paintStroke(0);
-        store().undo();
+    it("abandons a stroke in progress", () => {
+        const workspace = saved();
+        actions().beginStroke();
+        actions().paintCells([5]);
 
-        const colors = createBlankGrid(4);
-        colors[0] = "#3EA6FF";
-        store().loadSketch({ gridSize: 4, colors });
+        actions().restoreWorkspace(workspace);
 
-        expect(store().gridSize).toBe(4);
-        expect(store().colors).toEqual(colors);
-        expect(selectCanUndo(store())).toBe(false);
-        expect(selectCanRedo(store())).toBe(false);
+        expect(store().document.strokeBaseline).toBeNull();
+        expect(canvasColors()[5]).toBe(BLANK_CELL_COLOR);
     });
 
-    it("copies the incoming colors rather than aliasing them", () => {
-        const colors = createBlankGrid(4);
-        store().loadSketch({ gridSize: 4, colors });
+    it("leaves the questions the workspace does not keep alone", () => {
+        const workspace = saved();
+        actions().stopAskingBeforeResize();
 
-        colors[0] = "#3EA6FF";
-
-        expect(store().colors[0]).toBe(BLANK_CELL_COLOR);
-    });
-});
-
-describe("asking before the drawing is replaced", () => {
-    it("asks before both a resize and a load to begin with", () => {
-        expect(store().askBeforeResize).toBe(true);
-        expect(store().askBeforeReplace).toBe(true);
-    });
-
-    it("stops asking before a resize without touching loads", () => {
-        store().stopAskingBeforeResize();
+        actions().restoreWorkspace(workspace);
 
         expect(store().askBeforeResize).toBe(false);
         expect(store().askBeforeReplace).toBe(true);
     });
-
-    it("stops asking before a load without touching resizes", () => {
-        store().stopAskingBeforeReplace();
-
-        expect(store().askBeforeReplace).toBe(false);
-        expect(store().askBeforeResize).toBe(true);
-    });
-
-    it("keeps the choice through the resizes and loads it outlives", () => {
-        store().stopAskingBeforeResize();
-        store().stopAskingBeforeReplace();
-
-        store().setGridSize(8);
-        store().loadSketch({ gridSize: 4, colors: createBlankGrid(4) });
-
-        expect(store().askBeforeResize).toBe(false);
-        expect(store().askBeforeReplace).toBe(false);
-    });
 });
 
-describe("selectHasWorkToLose", () => {
-    it("is false for a blank grid with no history", () => {
+describe("selectors", () => {
+    it("report work to lose once there is any", () => {
         expect(selectHasWorkToLose(store())).toBe(false);
-    });
 
-    it("is true once a cell is painted", () => {
         paintStroke(0);
 
         expect(selectHasWorkToLose(store())).toBe(true);
     });
 
-    it("is true for a painted grid with no history, as a loaded sketch is", () => {
-        const colors = createBlankGrid(4);
-        colors[15] = PEN_COLOR;
-        store().loadSketch({ gridSize: 4, colors });
-
-        expect(selectCanUndo(store())).toBe(false);
-        expect(selectHasWorkToLose(store())).toBe(true);
-    });
-
-    it("is true for a cleared grid, since the clear can still be undone", () => {
-        paintStroke(0);
-        store().clearGrid();
-
-        expect(isBlank()).toBe(true);
-        expect(selectHasWorkToLose(store())).toBe(true);
-    });
-
-    it("is true for a grid undone back to blank, since it can still be redone", () => {
-        paintStroke(0);
-        store().undo();
-
-        expect(isBlank()).toBe(true);
-        expect(selectHasWorkToLose(store())).toBe(true);
-    });
-
-    it("is false again once a resize has replaced the drawing", () => {
-        paintStroke(0);
-        store().setGridSize(8);
-
-        expect(selectHasWorkToLose(store())).toBe(false);
-    });
-});
-
-describe("selectSketch", () => {
-    it("returns the drawing without the editor state around it", () => {
-        store().setPenColor(PEN_COLOR);
-        store().setTool("eraser");
+    it("select the artwork without the editor state around it", () => {
         paintStroke(0);
 
         expect(selectSketch(store())).toEqual({
-            gridSize: store().gridSize,
-            colors: store().colors,
+            gridSize: DEFAULT_GRID_SIZE,
+            colors: canvasColors(),
         });
+    });
+
+    it("select the workspace as last committed, without a stroke in progress", () => {
+        actions().setTool("colorfulPen");
+        actions().toggleSymmetry("topBottom");
+        paintStroke(0);
+        const committed = selectWorkspace(store());
+
+        actions().beginStroke();
+        actions().paintCells([1]);
+
+        expect(selectWorkspace(store())).toEqual(committed);
+        expect(committed.document.colors).toBe(store().document.strokeBaseline);
+        expect(committed.settings).toEqual({
+            tool: "colorfulPen",
+            penColor: DEFAULT_PEN_COLOR,
+            symmetry: { topBottom: true, leftRight: false },
+            showGridLines: true,
+        });
+    });
+
+    it("keep the same actions object across updates", () => {
+        const before = store().actions;
+
+        paintStroke(0);
+        actions().toggleGridLines();
+
+        expect(store().actions).toBe(before);
     });
 });

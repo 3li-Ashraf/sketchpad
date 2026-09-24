@@ -1,22 +1,21 @@
 /**
- * @file Rendering a sketch to a PNG data URL through an off-screen canvas. It
- * only produces the URL; handing it to the browser is `fileDownload`'s job.
+ * @file Rendering a sketch to a PNG through off-screen canvases. It only
+ * produces the image; handing it to the browser is `fileDownload`'s job.
  */
 
 import { hexToRgb } from "../domain/color";
-import type { Sketch } from "../domain/grid";
+import { isValidSketch, type Sketch } from "../domain/grid";
+import { reportInvalidInput } from "../domain/invalidInput";
 
 /** Edge length, in image pixels, of one grid cell in an exported PNG. */
 export const DEFAULT_EXPORT_CELL_SIZE = 50;
 
-const OPAQUE = 255;
 const BYTES_PER_PIXEL = 4;
+const OPAQUE = 255;
 
 /**
- * Paints the sketch into an RGBA buffer at one image pixel per cell. Hex parsing
- * is memoized against the distribution real sketches have — a handful of distinct
- * colors across up to 4096 cells — so `hexToRgb` runs a few times rather than
- * once per cell.
+ * One RGBA pixel per cell. Sketches hold few distinct colors across up to 4096
+ * cells, so each color is parsed once rather than once per cell.
  */
 const toPixels = ({
     gridSize,
@@ -44,54 +43,66 @@ const toPixels = ({
     return pixels;
 };
 
-const createCanvas = (
+// Each canvas is checked on its own: a browser can grant the small one and
+// refuse the full-size one (3200×3200 for a 64×64 sketch).
+const create2dContext = (
     width: number,
     height: number
-): [HTMLCanvasElement, CanvasRenderingContext2D | null] => {
+): CanvasRenderingContext2D => {
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
 
-    return [canvas, canvas.getContext("2d")];
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error(`No 2D context for ${width}×${height}`);
+
+    return context;
 };
 
 /**
- * Renders the sketch at `cellSize` image pixels per cell and returns it as a PNG
- * data URL, or null when a 2D context cannot be had. Null is an ordinary outcome,
- * not an error path: it is what the test suite sees, since jsdom ships no 2D
- * canvas, and the caller turns it into a message rather than an assertion. Both
- * contexts are checked separately because a browser can grant the small surface
- * and refuse the full-size one.
+ * Renders the sketch at `cellSize` image pixels per cell. It draws one pixel
+ * per cell and scales that up once with smoothing off, which keeps cell edges
+ * hard; that is exact only for a whole-number `cellSize`, hence the check.
  *
- * The sketch is drawn once at one pixel per cell and then blitted up in a single
- * scaled draw with image smoothing off, which keeps cells square-edged instead of
- * blurring them into each other. That is an exact nearest-neighbour scale only
- * when the factor is a whole number; nothing enforces an integer `cellSize`, so
- * the guarantee rests on callers passing one.
+ * Rejects a sketch that does not hold together, a cell size that is not a
+ * positive whole number, and a browser that cannot provide a canvas or encode
+ * the image.
  */
-export const sketchToPngDataUrl = (
+export const renderSketchPng = async (
     sketch: Sketch,
     cellSize: number = DEFAULT_EXPORT_CELL_SIZE
-): string | null => {
+): Promise<Blob> => {
+    if (!isValidSketch(sketch)) {
+        reportInvalidInput("renderSketchPng", "not a valid sketch", sketch);
+        throw new TypeError("Not a valid sketch");
+    }
+    if (!Number.isInteger(cellSize) || cellSize < 1) {
+        reportInvalidInput(
+            "renderSketchPng",
+            "not a whole cell size",
+            cellSize
+        );
+        throw new RangeError("Cell size must be a positive integer");
+    }
+
     const { gridSize } = sketch;
 
-    const [source, sourceContext] = createCanvas(gridSize, gridSize);
-    if (!sourceContext) return null;
-
-    sourceContext.putImageData(
+    const source = create2dContext(gridSize, gridSize);
+    source.putImageData(
         new ImageData(toPixels(sketch), gridSize, gridSize),
         0,
         0
     );
 
-    const [output, outputContext] = createCanvas(
-        gridSize * cellSize,
-        gridSize * cellSize
+    const size = gridSize * cellSize;
+    const output = create2dContext(size, size);
+    output.imageSmoothingEnabled = false;
+    output.drawImage(source.canvas, 0, 0, size, size);
+
+    const png = await new Promise<Blob | null>((resolve) =>
+        output.canvas.toBlob(resolve, "image/png")
     );
-    if (!outputContext) return null;
+    if (!png) throw new Error("The image could not be encoded");
 
-    outputContext.imageSmoothingEnabled = false;
-    outputContext.drawImage(source, 0, 0, output.width, output.height);
-
-    return output.toDataURL("image/png");
+    return png;
 };

@@ -1,27 +1,19 @@
 /**
- * @file Deflate and inflate over the browser's Compression Streams. It knows
- * nothing of the save format that uses it — only bytes in, bytes out.
+ * @file Deflate and inflate over the browser's Compression Streams: bytes in,
+ * bytes out, with no knowledge of the save format that uses them.
  */
 
 /**
- * A byte buffer backed by a plain `ArrayBuffer`. Pinning the backing type is
- * what lets a value be handed to `BufferSource` APIs such as `CompressionStream`
- * and the `Blob` constructor, which do not accept a possibly-shared buffer.
+ * A byte buffer on a plain `ArrayBuffer`, which is what `BufferSource` APIs
+ * such as `Blob` and `CompressionStream` accept.
  */
 export type Bytes = Uint8Array<ArrayBuffer>;
 
-// zlib-wrapped deflate rather than `deflate-raw`. The wrapper costs six bytes
-// and carries an adler32, so a damaged file is caught at decompression without
-// a checksum of this project's own.
+// zlib-wrapped rather than `deflate-raw`: six bytes buy an adler32, so a
+// damaged file is caught at decompression without a checksum of our own.
 const FORMAT = "deflate";
 
-// Built by hand rather than with `Blob.stream()`, which is missing under jsdom —
-// where `ReadableStream` and `CompressionStream` come from Node but `Blob` comes
-// from jsdom — so the obvious one-liner would take the whole suite down with it.
-//
-// The element type is widened to `BufferSource` to match what
-// `CompressionStream` accepts. Narrowing it to `Bytes` looks like a tightening
-// and would break the `pipeThrough` calls below.
+// Built by hand because `Blob.stream()` is missing under jsdom.
 const streamOf = (bytes: Bytes): ReadableStream<BufferSource> =>
     new ReadableStream({
         start(controller) {
@@ -30,10 +22,10 @@ const streamOf = (bytes: Bytes): ReadableStream<BufferSource> =>
         },
     });
 
-// Either direction arrives in several chunks once the data is large enough, so
-// the pieces are gathered first and their total length is known before the one
-// output buffer is allocated.
-const collect = async (stream: ReadableStream<Uint8Array>): Promise<Bytes> => {
+const collect = async (
+    stream: ReadableStream<Uint8Array>,
+    maxLength: number
+): Promise<Bytes> => {
     const reader = stream.getReader();
     const chunks: Uint8Array[] = [];
     let length = 0;
@@ -42,8 +34,13 @@ const collect = async (stream: ReadableStream<Uint8Array>): Promise<Bytes> => {
         const { done, value } = await reader.read();
         if (done) break;
 
-        chunks.push(value);
         length += value.length;
+        if (length > maxLength) {
+            await reader.cancel();
+            throw new RangeError(`Output exceeds ${maxLength} bytes`);
+        }
+
+        chunks.push(value);
     }
 
     const bytes = new Uint8Array(length);
@@ -58,14 +55,19 @@ const collect = async (stream: ReadableStream<Uint8Array>): Promise<Bytes> => {
 };
 
 export const deflate = (bytes: Bytes): Promise<Bytes> =>
-    collect(streamOf(bytes).pipeThrough(new CompressionStream(FORMAT)));
+    collect(
+        streamOf(bytes).pipeThrough(new CompressionStream(FORMAT)),
+        Infinity
+    );
 
 /**
- * Rejects on input that is corrupted or not deflate output at all. Callers are
- * expected to treat a rejection as "not a readable file" rather than let it
- * escape — `parseSketch` catches it and reports the file as damaged, which
- * `useSketchFiles` reports in a dialog. `deflate` carries no such contract; its
- * own failures are caught separately, where the sketch is saved.
+ * Rejects on input that is corrupt or not deflate data, and stops reading and
+ * rejects once the output passes `maxLength`. The limit is required because a
+ * few kilobytes of deflate can expand to hundreds of megabytes, so a caller
+ * reading untrusted bytes has to say how much it is prepared to hold.
  */
-export const inflate = (bytes: Bytes): Promise<Bytes> =>
-    collect(streamOf(bytes).pipeThrough(new DecompressionStream(FORMAT)));
+export const inflate = (bytes: Bytes, maxLength: number): Promise<Bytes> =>
+    collect(
+        streamOf(bytes).pipeThrough(new DecompressionStream(FORMAT)),
+        maxLength
+    );

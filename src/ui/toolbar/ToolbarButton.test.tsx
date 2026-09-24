@@ -1,10 +1,7 @@
-/**
- * @file Covers `ToolbarButton`: its accessible name, pressed state and tooltip.
- */
-
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+
 import { ToolbarButton } from "./ToolbarButton";
 
 const button = () => screen.getByRole("button", { name: "Pen" });
@@ -33,7 +30,7 @@ describe("ToolbarButton", () => {
         expect(onClick).toHaveBeenCalledOnce();
     });
 
-    it("reports its pressed state to assistive technology and to CSS", () => {
+    it("reports its pressed state through aria-pressed", () => {
         const { rerender } = render(
             <ToolbarButton label="Pen" isActive onClick={vi.fn()}>
                 <svg />
@@ -41,7 +38,6 @@ describe("ToolbarButton", () => {
         );
 
         expect(button()).toHaveAttribute("aria-pressed", "true");
-        expect(button()).toHaveAttribute("data-active", "true");
 
         rerender(
             <ToolbarButton label="Pen" isActive={false} onClick={vi.fn()}>

@@ -1,14 +1,11 @@
 /**
  * @file The undo/redo model. A step records only the cells it changed, so memory
- * follows what was actually drawn rather than grid area times session length.
- * Pure: no DOM, no React, no store.
+ * follows what was drawn rather than grid area times session length.
  */
 
 /**
- * Undoable steps kept. This bounds the depth of the stack, not its memory: an
- * entry is as large as the step it records, so a hundred one-cell taps and a
- * hundred full-canvas clears both sit at the cap while costing very different
- * amounts.
+ * Undoable steps kept. This bounds depth, not memory: an entry is as large as
+ * the step it records.
  */
 export const MAX_HISTORY_ENTRIES = 100;
 
@@ -18,20 +15,13 @@ export interface CellChange {
     after: string;
 }
 
-/**
- * One undoable step. `state/sketchStore` records one per committed stroke, per
- * flood fill and per clear, so a step is not always a stroke.
- */
+/** One undoable step: a committed stroke, a flood fill or a clear. */
 export type HistoryEntry = readonly CellChange[];
 
 /**
- * The cells that differ between two snapshots of the same grid.
- *
- * Grids of different lengths yield no changes rather than a partial diff: the
- * two sides then belong to different grid sizes, and a partial diff would carry
- * indices past the end of the shorter grid. Normal flow never reaches that
- * branch — `setGridSize` and `loadSketch` both clear the stacks — so it is a
- * backstop rather than a case the app relies on.
+ * The cells that differ between two snapshots of the same grid. Grids of
+ * different lengths yield nothing rather than a partial diff with indices past
+ * the shorter one; a resize starts a new document, so this is only a backstop.
  */
 export const diffColors = (
     before: readonly string[],
@@ -50,20 +40,11 @@ export const diffColors = (
     return changes;
 };
 
-/**
- * Appends a step, dropping the oldest once the cap is reached.
- *
- * The capped branch trims first and then spreads, rather than the more readable
- * `[...past, entry].slice(-MAX_HISTORY_ENTRIES)`, so the oversized intermediate
- * that form would build and immediately discard is never created.
- */
+/** Appends a step, dropping the oldest once the cap is reached. */
 export const appendEntry = (
     past: readonly HistoryEntry[],
     entry: HistoryEntry
-): HistoryEntry[] =>
-    past.length < MAX_HISTORY_ENTRIES
-        ? [...past, entry]
-        : [...past.slice(past.length - MAX_HISTORY_ENTRIES + 1), entry];
+): HistoryEntry[] => [...past, entry].slice(-MAX_HISTORY_ENTRIES);
 
 const applyEntry = (
     colors: readonly string[],

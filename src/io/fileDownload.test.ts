@@ -1,44 +1,25 @@
-/**
- * @file Covers `io/fileDownload`. jsdom performs no navigation, so the anchor
- * click and the object-URL pair are intercepted by `recordDownloads` and the
- * assertions are about what the browser was asked to do.
- */
+/** @vitest-environment jsdom */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
+    type DownloadRecording,
     recordDownloads,
     STUB_OBJECT_URL,
-    type DownloadRecording,
-} from "../test/browserStubs";
-import { downloadBlob, downloadUrl } from "./fileDownload";
+} from "../test/jsdomStubs";
+import { downloadBlob } from "./fileDownload";
 
 let recording: DownloadRecording;
+
+const blob = () =>
+    new Blob([Uint8Array.of(1, 2, 3)], { type: "application/octet-stream" });
 
 beforeEach(() => {
     recording = recordDownloads();
 });
 
-describe("downloadUrl", () => {
-    it("clicks a link carrying the URL and file name", () => {
-        downloadUrl("data:image/png;base64,AAAA", "sketch.png");
-
-        expect(recording.downloads).toEqual([
-            { href: "data:image/png;base64,AAAA", fileName: "sketch.png" },
-        ]);
-    });
-
-    it("never attaches the link to the document", () => {
-        downloadUrl("data:text/plain,hi", "note.txt");
-
-        expect(document.querySelectorAll("a")).toHaveLength(0);
-    });
-});
-
 describe("downloadBlob", () => {
-    const blob = () =>
-        new Blob([Uint8Array.of(1, 2, 3)], { type: "application/octet-stream" });
-
-    it("downloads the blob through an object URL", () => {
+    it("clicks a link to an object URL for the blob, carrying the file name", () => {
         const contents = blob();
 
         downloadBlob(contents, "sketch.skpd");
@@ -56,11 +37,19 @@ describe("downloadBlob", () => {
     });
 
     it("revokes the object URL even when the click throws", () => {
-        vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {
-            throw new Error("blocked");
-        });
+        vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+            () => {
+                throw new Error("blocked");
+            }
+        );
 
         expect(() => downloadBlob(blob(), "sketch.skpd")).toThrow("blocked");
         expect(recording.revoked).toEqual([STUB_OBJECT_URL]);
+    });
+
+    it("leaves no link behind in the document", () => {
+        downloadBlob(blob(), "sketch.skpd");
+
+        expect(document.querySelector("a")).toBeNull();
     });
 });

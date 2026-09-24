@@ -1,114 +1,97 @@
 /**
- * @file The settings panel: every control the editor offers, wired to the store.
- * It is a declarative arrangement and holds no logic of its own — the drawing
- * rules are in the store, resizing is in `useGridResize`, and saving, loading
- * and exporting are in `useSketchFiles`.
+ * @file The settings panel: every control the editor offers, wired to the
+ * store. It holds no logic of its own; the grid size and file operations are
+ * features of their own, in `ui/gridSize` and `ui/files`.
  */
 
 import { BiSolidEraser } from "react-icons/bi";
 import { FaRedo, FaUndo } from "react-icons/fa";
-import { FiDownload, FiImage, FiTrash2, FiUpload } from "react-icons/fi";
+import {
+    FiDownload,
+    FiFilePlus,
+    FiImage,
+    FiTrash2,
+    FiUpload,
+} from "react-icons/fi";
 import { HiPencil } from "react-icons/hi2";
 import { IoMdColorFill } from "react-icons/io";
 import { TbBorderAll, TbFlipHorizontal, TbFlipVertical } from "react-icons/tb";
+
 import { SKETCH_FILE_EXTENSION } from "../../io/sketchFile";
 import {
     selectCanRedo,
     selectCanUndo,
+    useSketchActions,
     useSketchStore,
 } from "../../state/sketchStore";
-import { useGridResize } from "./useGridResize";
-import { useSketchFiles } from "./useSketchFiles";
 import { ConfirmDialog, NoticeDialog } from "../common/Dialog";
-import {
-    EDITOR_PANEL_HEIGHT,
-    TOOLBAR_PANEL_HEIGHT,
-} from "../common/panelSize";
+import { EDITOR_PANEL_HEIGHT, TOOLBAR_PANEL_HEIGHT } from "../common/panelSize";
+import { useSketchFiles } from "../files/useSketchFiles";
+import { GridSizeControl } from "../gridSize/GridSizeControl";
 import { ColorfulPenIcon } from "./ColorfulPenIcon";
 import { ColorPicker } from "./ColorPicker";
-import { GridSizeSlider } from "./GridSizeSlider";
+import { RotateRightIcon } from "./RotateRightIcon";
 import { ToolbarButton } from "./ToolbarButton";
+import { useNewSketch } from "./useNewSketch";
 
 interface ToolbarProps {
     ref?: React.Ref<HTMLElement>;
+    id?: string;
+    /** Whether the panel shows below the `md` breakpoint, where it collapses. */
     isOpen: boolean;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({ ref, id, isOpen }) => {
     const penColor = useSketchStore((state) => state.penColor);
     const tool = useSketchStore((state) => state.tool);
-    const mirrorX = useSketchStore((state) => state.mirrorX);
-    const mirrorY = useSketchStore((state) => state.mirrorY);
+    const symmetry = useSketchStore((state) => state.symmetry);
     const showGridLines = useSketchStore((state) => state.showGridLines);
     const canUndo = useSketchStore(selectCanUndo);
     const canRedo = useSketchStore(selectCanRedo);
 
-    const undo = useSketchStore((state) => state.undo);
-    const redo = useSketchStore((state) => state.redo);
-    const setPenColor = useSketchStore((state) => state.setPenColor);
-    const setTool = useSketchStore((state) => state.setTool);
-    const clearGrid = useSketchStore((state) => state.clearGrid);
-    const toggleMirrorX = useSketchStore((state) => state.toggleMirrorX);
-    const toggleMirrorY = useSketchStore((state) => state.toggleMirrorY);
-    const toggleGridLines = useSketchStore((state) => state.toggleGridLines);
-
-    const { gridSize, isLocked, resize, allowResize, resizeDialog } =
-        useGridResize();
+    const {
+        undo,
+        redo,
+        setPenColor,
+        setTool,
+        clearCanvas,
+        rotateCanvas,
+        toggleSymmetry,
+        toggleGridLines,
+    } = useSketchActions();
 
     const {
         fileInputRef,
         saveSketch,
         exportPng,
-        openFilePicker,
-        loadSelectedFile,
+        openSketch,
+        openChosenFile,
         failureDialog,
         replaceDialog,
     } = useSketchFiles();
 
+    const { requestNewSketch, newSketchDialog } = useNewSketch();
+
     return (
         <aside
             ref={ref}
+            id={id}
             aria-label="Settings"
-            className={`${isOpen ? "flex" : "hidden"} md:flex flex-col justify-between absolute md:static 2xl:absolute left-[2vw] ${TOOLBAR_PANEL_HEIGHT} ${EDITOR_PANEL_HEIGHT} bg-surface border border-accent rounded-md p-6 lg:p-8`}
+            className={`${isOpen ? "flex" : "hidden"} absolute left-[2vw] flex-col justify-between md:static md:flex 2xl:absolute ${TOOLBAR_PANEL_HEIGHT} ${EDITOR_PANEL_HEIGHT} rounded-md border border-accent bg-surface p-6 lg:p-8`}
         >
-            <h2 className="font-pixeled text-center text-lg">Settings</h2>
+            <h2 className="text-center font-pixeled text-lg">Settings</h2>
 
-            <GridSizeSlider
-                gridSize={gridSize}
-                isLocked={isLocked}
-                onChange={resize}
-                onBeforeChange={allowResize}
-            />
+            <GridSizeControl />
 
-            <div className="grid grid-cols-2 place-items-center gap-4 lg:gap-5 xl:gap-8">
+            {/* Two controls to a row, in the order the owner chose;
+                `Toolbar.test` pins it, so a change is deliberate. */}
+            <div className="toolbar-grid grid grid-cols-2 place-items-center gap-x-4 gap-y-3 lg:gap-5 xl:gap-8">
                 <ToolbarButton
                     label="Pen"
                     isActive={tool === "pen"}
                     onClick={() => setTool("pen")}
                 >
                     <HiPencil />
-                </ToolbarButton>
-
-                <ColorPicker color={penColor} onChange={setPenColor} />
-
-                <ToolbarButton
-                    label="Colorful Pen"
-                    isActive={tool === "colorfulPen"}
-                    onClick={() => setTool("colorfulPen")}
-                >
-                    <ColorfulPenIcon />
-                </ToolbarButton>
-
-                <ToolbarButton
-                    label="Fill"
-                    isActive={tool === "fill"}
-                    onClick={() => setTool("fill")}
-                >
-                    <IoMdColorFill />
-                </ToolbarButton>
-
-                <ToolbarButton label="Clear Grid" onClick={clearGrid}>
-                    <FiTrash2 />
                 </ToolbarButton>
 
                 <ToolbarButton
@@ -120,46 +103,87 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
                 </ToolbarButton>
 
                 <ToolbarButton
-                    label="Grid Lines"
+                    label="Fill"
+                    isActive={tool === "fill"}
+                    onClick={() => setTool("fill")}
+                >
+                    <IoMdColorFill />
+                </ToolbarButton>
+
+                <ColorPicker color={penColor} onChange={setPenColor} />
+
+                <ToolbarButton
+                    label="Colorful pen"
+                    isActive={tool === "colorfulPen"}
+                    onClick={() => setTool("colorfulPen")}
+                >
+                    <ColorfulPenIcon />
+                </ToolbarButton>
+
+                <ToolbarButton
+                    label="Grid lines"
                     isActive={showGridLines}
                     onClick={toggleGridLines}
                 >
                     <TbBorderAll />
                 </ToolbarButton>
 
-                <ToolbarButton label="Screenshot" onClick={exportPng}>
-                    <FiImage />
+                <ToolbarButton label="Clear canvas" onClick={clearCanvas}>
+                    <FiTrash2 />
+                </ToolbarButton>
+
+                <ToolbarButton label="New sketch" onClick={requestNewSketch}>
+                    <FiFilePlus />
                 </ToolbarButton>
 
                 <ToolbarButton
-                    label="Mirror X"
-                    isActive={mirrorX}
-                    onClick={toggleMirrorX}
+                    label="Top–bottom symmetry"
+                    isActive={symmetry.topBottom}
+                    onClick={() => toggleSymmetry("topBottom")}
                 >
                     <TbFlipHorizontal />
                 </ToolbarButton>
 
                 <ToolbarButton
-                    label="Mirror Y"
-                    isActive={mirrorY}
-                    onClick={toggleMirrorY}
+                    label="Left–right symmetry"
+                    isActive={symmetry.leftRight}
+                    onClick={() => toggleSymmetry("leftRight")}
                 >
                     <TbFlipVertical />
                 </ToolbarButton>
 
-                <ToolbarButton label="Undo" isDisabled={!canUndo} onClick={undo}>
+                <ToolbarButton
+                    label="Rotate 90° clockwise"
+                    onClick={rotateCanvas}
+                >
+                    <RotateRightIcon />
+                </ToolbarButton>
+
+                <ToolbarButton label="Export PNG" onClick={exportPng}>
+                    <FiImage />
+                </ToolbarButton>
+
+                <ToolbarButton
+                    label="Undo"
+                    isDisabled={!canUndo}
+                    onClick={undo}
+                >
                     <FaUndo />
                 </ToolbarButton>
 
-                <ToolbarButton label="Redo" isDisabled={!canRedo} onClick={redo}>
+                <ToolbarButton
+                    label="Redo"
+                    isDisabled={!canRedo}
+                    onClick={redo}
+                >
                     <FaRedo />
                 </ToolbarButton>
 
-                <ToolbarButton label="Save Grid" onClick={saveSketch}>
+                <ToolbarButton label="Save sketch" onClick={saveSketch}>
                     <FiDownload />
                 </ToolbarButton>
 
-                <ToolbarButton label="Load Grid" onClick={openFilePicker}>
+                <ToolbarButton label="Open sketch" onClick={openSketch}>
                     <FiUpload />
                 </ToolbarButton>
             </div>
@@ -170,13 +194,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, isOpen }) => {
                 aria-label="Sketch file"
                 className="hidden"
                 accept={SKETCH_FILE_EXTENSION}
-                onChange={loadSelectedFile}
+                onChange={openChosenFile}
             />
 
-            {/* Rendered here, where their state lives, but shown outside the
-                panel: each dialog portals itself to the body. */}
-            {resizeDialog && <ConfirmDialog {...resizeDialog} />}
+            {/* Rendered where their state lives; each portals itself out. */}
             {replaceDialog && <ConfirmDialog {...replaceDialog} />}
+            {newSketchDialog && <ConfirmDialog {...newSketchDialog} />}
             {failureDialog && <NoticeDialog {...failureDialog} />}
         </aside>
     );

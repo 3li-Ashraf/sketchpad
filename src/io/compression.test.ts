@@ -1,11 +1,6 @@
-/**
- * @file Covers `io/compression`: that a round trip is lossless at several sizes,
- * that the multi-chunk reassembly in `collect` is exercised, and that damaged
- * input is rejected rather than quietly returning garbage.
- */
+import { describe, expect, it, vi } from "vitest";
 
-import { describe, expect, it } from "vitest";
-import { deflate, inflate, type Bytes } from "./compression";
+import { type Bytes, deflate, inflate } from "./compression";
 
 const bytesOf = (...values: number[]): Bytes => Uint8Array.from(values);
 
@@ -13,9 +8,8 @@ const repeated = (byte: number, length: number): Bytes =>
     new Uint8Array(length).fill(byte);
 
 /**
- * Deterministic bytes that deflate cannot shrink. A plain counter or a short
- * cycle will not do — those compress away — so this is an xorshift32, whose low
- * byte passes through all 256 values with no repeat deflate can point at.
+ * Deterministic bytes deflate cannot shrink: an xorshift32, whose low byte
+ * has no repeat for the compressor to point at.
  */
 const incompressible = (length: number): Bytes => {
     const bytes = new Uint8Array(length);
@@ -33,8 +27,7 @@ const incompressible = (length: number): Bytes => {
     return bytes;
 };
 
-// A zlib stream is a two-byte header, the deflate data, then a four-byte
-// adler32 of the original bytes.
+// A zlib stream is a two-byte header, the deflate data, then an adler32.
 const ZLIB_HEADER_SIZE = 2;
 const ADLER32_SIZE = 4;
 
@@ -42,83 +35,113 @@ describe("deflate and inflate", () => {
     it("round-trips a payload", async () => {
         const payload = bytesOf(1, 2, 3, 4, 5);
 
-        expect([...(await inflate(await deflate(payload)))]).toEqual([...payload]);
+        expect(await inflate(await deflate(payload), Infinity)).toEqual(
+            payload
+        );
     });
 
     it("round-trips an empty payload", async () => {
-        expect(await inflate(await deflate(new Uint8Array(0)))).toHaveLength(0);
+        expect(
+            await inflate(await deflate(new Uint8Array(0)), Infinity)
+        ).toHaveLength(0);
     });
 
-    it("round-trips a payload larger than one stream chunk", async () => {
-        // The fill is a period-256 cycle through all 256 byte values, so it is
-        // varied enough not to be a single run yet still compresses hard: 256 KB
-        // deflates to about 1.3 KB. The reassembly this covers is on the inflate
-        // side, where the 256 KB result arrives as sixteen 16 KB chunks — a chunk
-        // size the runtime chooses, not one either side declares.
+    it("reassembles output that arrives in many chunks", async () => {
+        // 256 KB of a period-256 cycle deflates to about 1.3 KB and inflates
+        // back in sixteen chunks, a size the runtime chooses.
         const payload = new Uint8Array(256 * 1024);
         for (let at = 0; at < payload.length; at++) {
             payload[at] = (at * 2654435761) & 0xff;
         }
 
-        const restored = await inflate(await deflate(payload));
-
-        expect(restored).toHaveLength(payload.length);
-        expect(restored).toEqual(payload);
+        expect(await inflate(await deflate(payload), Infinity)).toEqual(
+            payload
+        );
     });
 
     it("round-trips data the compressor cannot shrink", async () => {
-        // The neighbouring case covers reassembly on the inflate side only: its
-        // payload collapses to about 1.3 KB, which deflate hands over in a
-        // single chunk after the header. Reaching the same loop on the deflate
-        // side needs output too large for one chunk, which only incompressible
-        // input produces — this arrives as six.
+        // The only input whose deflate output spans several chunks.
         const payload = incompressible(64 * 1024);
         const compressed = await deflate(payload);
 
         expect(compressed.length).toBeGreaterThan(payload.length);
-        expect(await inflate(compressed)).toEqual(payload);
+        expect(await inflate(compressed, Infinity)).toEqual(payload);
     });
 
     it("shrinks repetitive data", async () => {
         const payload = repeated(0x42, 4096);
 
-        expect((await deflate(payload)).length).toBeLessThan(payload.length / 10);
+        expect((await deflate(payload)).length).toBeLessThan(
+            payload.length / 10
+        );
     });
 });
 
 describe("inflate", () => {
     it("rejects data that is not deflate output at all", async () => {
-        await expect(inflate(bytesOf(1, 2, 3, 4, 5, 6))).rejects.toThrow();
+        await expect(
+            inflate(bytesOf(1, 2, 3, 4, 5, 6), Infinity)
+        ).rejects.toThrow();
     });
 
     it("rejects truncated deflate output", async () => {
         const compressed = await deflate(repeated(0x42, 4096));
 
         await expect(
-            inflate(compressed.subarray(0, compressed.length - 4) as Bytes)
+            inflate(compressed.subarray(0, compressed.length - 4), Infinity)
         ).rejects.toThrow();
     });
 
     it("rejects corruption inside the compressed body", async () => {
-        // Aimed between the header and the trailer, so this damages the deflate
-        // data itself rather than the adler32 the next case flips. Both are
-        // rejected, but by different machinery.
         const compressed = await deflate(repeated(0x42, 4096));
         const inBody = Math.floor(
             (ZLIB_HEADER_SIZE + compressed.length - ADLER32_SIZE) / 2
         );
         compressed[inBody] ^= 0xff;
 
-        await expect(inflate(compressed)).rejects.toThrow();
+        await expect(inflate(compressed, Infinity)).rejects.toThrow();
     });
 
     it("rejects a corrupted checksum, which is what catches a damaged file", async () => {
-        // `length - 3` lands inside the adler32 trailer rather than in the
-        // deflate data. This is the half that costs the format nothing: a
-        // damaged file is caught without any checksum of this project's own.
         const compressed = await deflate(repeated(0x42, 4096));
         compressed[compressed.length - 3] ^= 0xff;
 
-        await expect(inflate(compressed)).rejects.toThrow();
+        await expect(inflate(compressed, Infinity)).rejects.toThrow();
+    });
+
+    it("accepts output of exactly the limit", async () => {
+        const payload = repeated(0x42, 4096);
+
+        expect(await inflate(await deflate(payload), 4096)).toEqual(payload);
+    });
+
+    describe("past the limit", () => {
+        // Outcomes are reduced to a word, so a regression fails with a message
+        // instead of printing megabytes of inflated bytes.
+        const outcomeOf = (inflating: Promise<Bytes>) =>
+            inflating.then(
+                () => "inflated in full",
+                (error: unknown) =>
+                    error instanceof RangeError ? "stopped" : "failed"
+            );
+
+        it("stops at output one byte over the limit", async () => {
+            const compressed = await deflate(repeated(0x42, 4097));
+
+            expect(await outcomeOf(inflate(compressed, 4096))).toBe("stopped");
+        });
+
+        it("stops reading instead of inflating everything first", async () => {
+            // 4 MB of zeros deflates to about 4 kB, the shape of a file built
+            // to exhaust memory. Unbounded, it inflates in hundreds of chunks.
+            const bomb = await deflate(new Uint8Array(4 * 1024 * 1024));
+            const read = vi.spyOn(
+                ReadableStreamDefaultReader.prototype,
+                "read"
+            );
+
+            expect(await outcomeOf(inflate(bomb, 4096))).toBe("stopped");
+            expect(read.mock.calls.length).toBeLessThan(4);
+        });
     });
 });

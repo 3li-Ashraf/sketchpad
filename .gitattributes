@@ -1,0 +1,8 @@
+# Check out text files with LF on every platform, so formatting and diffs agree
+# between Windows and everywhere else.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.woff binary
+*.woff2 binary

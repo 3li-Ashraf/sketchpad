@@ -4,10 +4,13 @@
  */
 
 import { useCallback, useState } from "react";
+
+import type { SketchDocument } from "../../domain/sketchDocument";
 import {
     selectHasWorkToLose,
-    useSketchStore,
     type SketchStore,
+    useSketchActions,
+    useSketchStore,
 } from "../../state/sketchStore";
 import type { ConfirmDialogProps } from "../common/Dialog";
 
@@ -17,12 +20,11 @@ export const RESIZE_WARNING =
     "Changing the size will erase your drawing and its undo history. This can't be undone.";
 
 /**
- * The drawing as it stood when the slider was unlocked, held by identity. The
- * store replaces `colors` and the history stacks rather than mutating them, so
- * this matches exactly until the drawing next changes — a stroke, a fill, an
- * undo — and lapses on its own after that, without anything having to clear it.
+ * The drawing as it stood when the slider was unlocked, held by identity. Edits
+ * replace these arrays rather than mutate them, so the approval lapses on its
+ * own at the next stroke, fill or undo.
  */
-type Approval = Pick<SketchStore, "colors" | "undoStack" | "redoStack">;
+type Approval = Pick<SketchDocument, "colors" | "undoStack" | "redoStack">;
 
 interface GridResize {
     gridSize: number;
@@ -39,48 +41,43 @@ interface GridResize {
     resizeDialog: ConfirmDialogProps | null;
 }
 
-const isApproved = (state: SketchStore, approval: Approval | null): boolean =>
+const isApproved = (
+    { document }: SketchStore,
+    approval: Approval | null
+): boolean =>
     approval !== null &&
-    approval.colors === state.colors &&
-    approval.undoStack === state.undoStack &&
-    approval.redoStack === state.redoStack;
+    approval.colors === document.colors &&
+    approval.undoStack === document.undoStack &&
+    approval.redoStack === document.redoStack;
 
-// Ordered cheapest first: the scan in `selectHasWorkToLose` runs only when the
-// two flags have not already settled it.
+// Cheapest first: the grid scan runs only when the flags have not settled it.
 const isLockedFor = (state: SketchStore, approval: Approval | null): boolean =>
     state.askBeforeResize &&
     !isApproved(state, approval) &&
     selectHasWorkToLose(state);
 
 /**
- * Over a drawing the slider is locked, and the first press on it — or the first
- * key that would step it — asks before anything moves. Unlocking erases nothing
- * by itself: the drawing goes only once the slider is moved again and the size
- * actually changes. Cancel leaves it locked.
+ * Over a drawing the slider is locked, and the first press on it, or key that
+ * would step it, asks before anything moves. Unlocking erases nothing by
+ * itself: the drawing goes only once the slider moves and the size changes.
  *
- * The lock is subscribed to, because the slider has to be out of the pointer's
- * reach before a press arrives rather than refuse one afterwards. It is selected
- * as a boolean, so the toolbar re-renders when it flips rather than on every
- * painted cell.
+ * The lock is subscribed to because the slider must be out of the pointer's
+ * reach before a press arrives. It is selected as a boolean, so the toolbar
+ * re-renders when it flips rather than on every painted cell.
  */
 export const useGridResize = (): GridResize => {
-    const gridSize = useSketchStore((state) => state.gridSize);
-    const setGridSize = useSketchStore((state) => state.setGridSize);
-    const stopAskingBeforeResize = useSketchStore(
-        (state) => state.stopAskingBeforeResize
-    );
+    const gridSize = useSketchStore((state) => state.document.gridSize);
+    const { setGridSize, stopAskingBeforeResize } = useSketchActions();
 
     const [approval, setApproval] = useState<Approval | null>(null);
     const [isAsking, setIsAsking] = useState(false);
 
     const isLocked = useSketchStore((state) => isLockedFor(state, approval));
 
-    // Both read the store afresh rather than trusting `isLocked`, which is only
-    // as current as the last render.
-    //
-    // A step can still arrive while locked: a drag begun on a blank grid goes on
-    // under the pointer if a second finger paints meanwhile. It is dropped, so
-    // the new strokes are not erased unasked.
+    // Both read the store afresh: `isLocked` is only as current as the last
+    // render. A step can arrive while locked (a drag begun on a blank grid
+    // while a second finger paints) and is dropped, so nothing is erased
+    // unasked.
     const resize = useCallback(
         (size: number) => {
             if (!isLockedFor(useSketchStore.getState(), approval)) {
@@ -106,7 +103,7 @@ export const useGridResize = (): GridResize => {
                   if (dontAskAgain) stopAskingBeforeResize();
 
                   const { colors, undoStack, redoStack } =
-                      useSketchStore.getState();
+                      useSketchStore.getState().document;
                   setApproval({ colors, undoStack, redoStack });
                   setIsAsking(false);
               },

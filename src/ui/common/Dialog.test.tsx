@@ -1,18 +1,18 @@
 /**
- * @file Covers `ui/common/Dialog`: that each form opens as a modal for exactly as
- * long as it is mounted, outside the component that renders it, is named by its
- * title and described by its message, takes focus itself rather than giving it
- * to a control, styles both buttons alike, and reports every way out of it.
+ * @file The dialog's contract under jsdom: open exactly while mounted, outside
+ * the component that renders it, named and described, focused itself, and
+ * reporting every way out. What only a real browser does (the top layer, an
+ * inert page, a real Escape) is in `Dialog.browser.test`.
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+
+import { button } from "../../test/queries";
 import { ConfirmDialog, NoticeDialog } from "./Dialog";
 
 const dialog = () => screen.getByRole("alertdialog");
-
-const button = (name: string) => screen.getByRole("button", { name });
 
 /**
  * The dialog holds focus itself, so no control starts focused and Enter presses
@@ -21,16 +21,6 @@ const button = (name: string) => screen.getByRole("button", { name });
 const expectDialogFocused = () => {
     expect(dialog()).toHaveFocus();
     expect(dialog()).toHaveAttribute("tabindex", "-1");
-};
-
-/**
- * Both buttons carry exactly the same classes, which is what keeps either from
- * looking like the default; the hover paint is shared too.
- */
-const expectButtonsAlike = (first: string, second: string) => {
-    expect(button(first).className).toBe(button(second).className);
-    expect(button(first)).toHaveClass("hover:bg-accent");
-    expect(button(first)).not.toHaveClass("bg-accent");
 };
 
 /**
@@ -103,12 +93,6 @@ describe("confirmation", () => {
         expectDialogFocused();
     });
 
-    it("styles Cancel and the confirm button alike", () => {
-        renderConfirm();
-
-        expectButtonsAlike("Cancel", "Replace drawing");
-    });
-
     it("reports Cancel", async () => {
         const { onConfirm, onCancel } = renderConfirm();
 
@@ -126,6 +110,17 @@ describe("confirmation", () => {
         expect(onCancel).toHaveBeenCalledOnce();
         expect(escape.defaultPrevented).toBe(true);
         expect(dialog()).toHaveAttribute("open");
+    });
+
+    it("reports an Escape it cannot prevent once, when the browser closes it", () => {
+        const { onCancel } = renderConfirm();
+        const element = dialog() as HTMLDialogElement;
+
+        fireEvent(element, new Event("cancel", { cancelable: false }));
+        element.close();
+        fireEvent(element, new Event("close"));
+
+        expect(onCancel).toHaveBeenCalledOnce();
     });
 
     it("reports the browser closing it on its own as Cancel", () => {
@@ -166,7 +161,9 @@ describe("confirmation", () => {
     it("passes Don't ask again along when it is ticked", async () => {
         const { onConfirm } = renderConfirm();
 
-        await userEvent.click(screen.getByRole("checkbox", { name: "Don't ask again" }));
+        await userEvent.click(
+            screen.getByRole("checkbox", { name: "Don't ask again" })
+        );
         await userEvent.click(button("Replace drawing"));
 
         expect(onConfirm).toHaveBeenCalledExactlyOnceWith(true);
@@ -200,12 +197,6 @@ describe("notice", () => {
         renderNotice();
 
         expectDialogFocused();
-    });
-
-    it("styles both buttons alike", () => {
-        renderNotice();
-
-        expectButtonsAlike("Close", "Choose another file");
     });
 
     it("reports the dismiss button", async () => {

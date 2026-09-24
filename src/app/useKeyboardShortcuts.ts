@@ -1,10 +1,9 @@
-/**
- * @file The window-level undo/redo shortcuts. It owns the key bindings only; the
- * history itself lives in the store.
- */
+/** @file The window-level undo and redo shortcuts. */
 
 import { useEffect } from "react";
-import { useSketchStore } from "../state/sketchStore";
+
+import { useSketchActions } from "../state/sketchStore";
+import { isDialogOpen } from "../ui/common/isDialogOpen";
 
 /**
  * Ctrl/Cmd+Z undoes; Ctrl/Cmd+Y and Ctrl/Cmd+Shift+Z redo. Bound straight to the
@@ -13,8 +12,7 @@ import { useSketchStore } from "../state/sketchStore";
  * it is collapsed out of the document.
  */
 export const useKeyboardShortcuts = (): void => {
-    const undo = useSketchStore((state) => state.undo);
-    const redo = useSketchStore((state) => state.redo);
+    const { undo, redo } = useSketchActions();
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -27,11 +25,9 @@ export const useKeyboardShortcuts = (): void => {
 
             event.preventDefault();
 
-            // Nothing is undone behind a dialog. An open modal makes the page
-            // inert to the pointer and to focus, but not to this listener on the
-            // window, and a step undone underneath a question would change what
-            // the question was about.
-            if (document.querySelector("dialog[open]")) return;
+            // Nothing is undone behind a dialog: a step undone underneath a
+            // question would change what the question was about.
+            if (isDialogOpen()) return;
 
             if (isRedo) redo();
             else undo();

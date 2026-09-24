@@ -1,13 +1,13 @@
 /**
- * @file Browser APIs jsdom does not implement, stubbed just far enough to observe
- * what the code asks of them. They live in one place so the download, canvas and
- * gesture tests agree on how those APIs behave; none of them tries to be a
- * faithful implementation.
+ * @file Browser APIs jsdom lacks, stubbed just far enough to observe what the
+ * code asks of them. None is a faithful implementation; the browser project
+ * runs against the real ones.
  */
 
 import { vi } from "vitest";
 
-export const STUB_PNG_DATA_URL = "data:image/png;base64,STUB";
+/** What the stubbed canvas encodes every image as. */
+export const STUB_PNG = new Blob(["stub png"], { type: "image/png" });
 // An arbitrary sentinel, not a shape any browser produces.
 export const STUB_OBJECT_URL = "blob:sketchpad/1";
 
@@ -22,10 +22,7 @@ export interface DownloadRecording {
     revoked: string[];
 }
 
-/**
- * Intercepts the anchor click that starts a download, and the object-URL pair
- * around it, so a download can be asserted on without the browser performing one.
- */
+/** Records the anchor click that starts a download, and its object URL. */
 export const recordDownloads = (): DownloadRecording => {
     const recording: DownloadRecording = {
         downloads: [],
@@ -88,14 +85,14 @@ interface Canvas2dOptions {
      * browser that refuses to allocate a very large canvas. Unlimited by default.
      */
     contextsAvailable?: number;
+    /** Whether `toBlob` produces an image, or reports failure with null. */
+    encodes?: boolean;
 }
 
-/**
- * A 2D context that records the calls the PNG export makes, and an `ImageData` to
- * go with it. jsdom implements neither without the native `canvas` package.
- */
+/** A 2D context that records the calls the PNG export makes. */
 export const stubCanvas2d = ({
     contextsAvailable = Infinity,
+    encodes = true,
 }: Canvas2dOptions = {}): Canvas2dRecording => {
     const recording: Canvas2dRecording = {
         canvases: [],
@@ -111,6 +108,7 @@ export const stubCanvas2d = ({
             if (recording.canvases.length > contextsAvailable) return null;
 
             const context = {
+                canvas: this,
                 imageSmoothingEnabled: true,
                 putImageData(image: StubImageData) {
                     recording.putImageData.push({
@@ -140,28 +138,22 @@ export const stubCanvas2d = ({
         }
     );
 
-    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(
-        STUB_PNG_DATA_URL
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
+        (callback) => callback(encodes ? STUB_PNG : null)
     );
 
     return recording;
 };
 
-/**
- * Stands in for an environment with no 2D canvas at all, such as a server
- * renderer.
- */
+/** An environment with no 2D canvas at all. */
 export const stubCanvas2dUnavailable = (): void => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 };
 
 /**
- * jsdom defines `HTMLDialogElement` but implements none of it — `showModal` and
- * `close` are missing outright, so the first dialog opened would throw. This
- * installs the one part the app's dialogs rely on, the `open` attribute that
- * marks a dialog as shown, and none of what a browser does besides: no top
- * layer, no inert page behind it, no focus trap, and no `cancel` event on
- * Escape. A test that needs that last one dispatches it itself.
+ * jsdom lacks `showModal` and `close`. This toggles the `open` attribute and
+ * nothing else: no top layer, no inert page, no `cancel` on Escape, which a
+ * test dispatches itself when it needs one.
  */
 export const installDialog = (): void => {
     Object.assign(HTMLDialogElement.prototype, {
@@ -175,10 +167,9 @@ export const installDialog = (): void => {
 };
 
 /**
- * jsdom implements no pointer capture at all, so every call throws and the
- * production fallback swallows it — which would mean the capture path was never
- * exercised. A real browser captures, so the suite installs a working in-memory
- * implementation once and lets individual tests spy on it or make it throw.
+ * jsdom has no pointer capture, so every call would throw into the fallback and
+ * the capture path would go untested. This is a working in-memory one that
+ * tests can spy on or make throw.
  */
 export const installPointerCapture = (): void => {
     const captured = new WeakMap<Element, Set<number>>();

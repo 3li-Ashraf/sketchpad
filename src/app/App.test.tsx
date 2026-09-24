@@ -215,6 +215,44 @@ describe("keyboard shortcuts", () => {
         }
     });
 
+    // A layout without Latin letters types its own on the Z and Y keys, so
+    // those are found by where they sit. `code` names the key, not the letter.
+    it.each([
+        ["Russian", "я", "н"],
+        ["Greek", "ζ", "υ"],
+        ["Hebrew", "ז", "ט"],
+    ])(
+        "undoes and redoes by the keys' places on a %s layout",
+        (_, zLetter, yLetter) => {
+            render(<App />);
+            paintStroke(0);
+
+            fireEvent.keyDown(window, {
+                key: zLetter,
+                code: "KeyZ",
+                ctrlKey: true,
+            });
+            expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
+
+            fireEvent.keyDown(window, {
+                key: yLetter,
+                code: "KeyY",
+                ctrlKey: true,
+            });
+            expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
+        }
+    );
+
+    it("goes by the letter where a layout has Latin letters in other places", () => {
+        // German QWERTZ: the key labelled Z is where US QWERTY has its Y.
+        render(<App />);
+        paintStroke(0);
+
+        fireEvent.keyDown(window, { key: "z", code: "KeyY", ctrlKey: true });
+
+        expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
+    });
+
     it("leaves other modified keys to the browser", () => {
         render(<App />);
         paintStroke(0);

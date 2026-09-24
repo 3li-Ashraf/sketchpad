@@ -18,7 +18,7 @@ Tailwind CSS. It runs at <https://3li-ashraf.github.io/sketchpad>.
 - **History**: undo and redo a whole stroke at a time, up to 100 steps.
   <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes; <kbd>Ctrl</kbd>+<kbd>Y</kbd> or
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes (<kbd>Cmd</kbd> on
-  macOS).
+  macOS), on any keyboard layout.
 - **Files**: save a sketch to a compact `.skpd` file and open it again, or
   export it as a PNG at 50 pixels per cell. A file that cannot be opened is
   reported with the reason.

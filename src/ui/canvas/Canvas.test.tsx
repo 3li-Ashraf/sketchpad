@@ -67,9 +67,11 @@ const press = (row: number, column: number, button = 0) =>
         ...cellPoint(row, column),
     });
 
+/** A move with the primary button still held, as during a real drag. */
 const drag = (row: number, column: number) =>
     fireEvent.pointerMove(surface(), {
         pointerId: 1,
+        buttons: 1,
         ...cellPoint(row, column),
     });
 
@@ -298,6 +300,7 @@ describe("pointer painting", () => {
         press(0, 0);
         fireEvent.pointerMove(surface(), {
             pointerId: 1,
+            buttons: 1,
             clientX: SURFACE_SIZE * 2,
             clientY: SURFACE_SIZE * 2,
         });
@@ -409,6 +412,27 @@ describe("pointer painting", () => {
         expect(store().document.undoStack).toHaveLength(1);
         act(() => actions().undo());
         expect(isBlank()).toBe(true);
+    });
+
+    it("ends the stroke, painting nothing, when a move comes with no button held", () => {
+        // The release was never delivered, as when the window loses focus
+        // mid-drag. Painting on would draw wherever the pointer hovered.
+        render(<Canvas />);
+        press(0, 0);
+
+        fireEvent.pointerMove(surface(), {
+            pointerId: 1,
+            buttons: 0,
+            ...cellPoint(0, 3),
+        });
+        drag(0, 5);
+
+        expect(canvasColors().slice(0, 6)).toEqual([
+            PEN,
+            ...new Array<string>(5).fill(BLANK_CELL_COLOR),
+        ]);
+        expect(store().document.strokeBaseline).toBeNull();
+        expect(store().document.undoStack).toHaveLength(1);
     });
 
     it("ignores a release from a pointer that is not the one drawing", () => {

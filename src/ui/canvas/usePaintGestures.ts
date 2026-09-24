@@ -122,6 +122,14 @@ export const usePaintGestures = (): PaintGestures => {
         (event: React.PointerEvent<HTMLDivElement>) => {
             if (activePointerRef.current !== event.pointerId) return;
 
+            // Nothing is held any more, yet no release came, as when the
+            // window loses focus mid-drag. The stroke ends here, rather than
+            // go on painting wherever the pointer hovers.
+            if (event.buttons === 0) {
+                finishStroke(event.pointerId);
+                return;
+            }
+
             const position = cellPositionAt(event);
             if (!position) {
                 // Leaving the canvas pauses the stroke; coming back starts a
@@ -152,7 +160,7 @@ export const usePaintGestures = (): PaintGestures => {
             lastPositionRef.current = position;
             paintCells(indices);
         },
-        [cellPositionAt, paintCells]
+        [cellPositionAt, finishStroke, paintCells]
     );
 
     // On the window, so a stroke still commits when the pointer comes up

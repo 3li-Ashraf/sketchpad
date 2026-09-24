@@ -12,7 +12,8 @@ import { isStrokeTool } from "../../domain/tools";
 import { useSketchActions, useSketchStore } from "../../state/sketchStore";
 
 // Capture is an enhancement: without it the window listeners below still end
-// the stroke, so an environment that refuses it is not an error.
+// the stroke, so an environment that refuses it is not an error. Releasing a
+// pointer that is not captured, as after a touch ends, is refused the same way.
 const tryPointerCapture = (
     surface: HTMLElement,
     pointerId: number,
@@ -20,8 +21,7 @@ const tryPointerCapture = (
 ): void => {
     try {
         if (capture) surface.setPointerCapture(pointerId);
-        else if (surface.hasPointerCapture(pointerId))
-            surface.releasePointerCapture(pointerId);
+        else surface.releasePointerCapture(pointerId);
     } catch {
         // Drawing works without capture.
     }
@@ -50,12 +50,7 @@ export const usePaintGestures = (): PaintGestures => {
 
     const cellPositionAt = useCallback(
         (event: React.PointerEvent<HTMLDivElement>): CellPosition | null => {
-            const surface = surfaceRef.current;
-            if (!surface) return null;
-
-            const rect = surface.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return null;
-
+            const rect = event.currentTarget.getBoundingClientRect();
             const { gridSize } = useSketchStore.getState().document;
             const column = Math.floor(
                 ((event.clientX - rect.left) / rect.width) * gridSize
@@ -64,6 +59,8 @@ export const usePaintGestures = (): PaintGestures => {
                 ((event.clientY - rect.top) / rect.height) * gridSize
             );
 
+            // A surface not laid out yet has no size, which puts every point
+            // at a NaN or infinite cell, and so out of bounds too.
             const inBounds =
                 row >= 0 && row < gridSize && column >= 0 && column < gridSize;
 
@@ -106,8 +103,7 @@ export const usePaintGestures = (): PaintGestures => {
                 return;
             }
 
-            const surface = surfaceRef.current;
-            if (surface) tryPointerCapture(surface, event.pointerId, true);
+            tryPointerCapture(event.currentTarget, event.pointerId, true);
 
             activePointerRef.current = event.pointerId;
             lastPositionRef.current = position;

@@ -22,15 +22,17 @@ const colorsOf = (state: SketchStore): readonly string[] =>
     state.document.colors;
 
 /**
- * Compared over both lengths: a resize keeps the elements of the cells whose
- * index survives, and each of those must still show its new color.
+ * Compared over the length both grids share. A resize keeps the elements of
+ * the cells whose index survives, and each of those must still show its new
+ * color; past that length, a cell is either new, and reads the store as it
+ * mounts, or about to unmount.
  */
 const wakeChangedCells = (state: SketchStore): void => {
     const previous = colors;
     colors = colorsOf(state);
     if (colors === previous) return;
 
-    const length = Math.max(colors.length, previous.length);
+    const length = Math.min(colors.length, previous.length);
     for (let index = 0; index < length; index++) {
         if (colors[index] === previous[index]) continue;
 

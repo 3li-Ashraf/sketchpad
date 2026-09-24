@@ -7,36 +7,48 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BLANK_CELL_COLOR } from "../../domain/grid";
+import { hexToRgb } from "../../domain/color";
+import {
+    BLANK_CELL_COLOR,
+    type CellPosition,
+    toCellIndex,
+} from "../../domain/grid";
+import { traceLine } from "../../domain/line";
 import { useSketchStore } from "../../state/sketchStore";
+import { fc } from "../../test/property";
 import {
     actions,
     canvasColors,
     paintStroke,
+    resetSketchStore,
     store,
 } from "../../test/storeHelpers";
 import { Canvas } from "./Canvas";
+import { CanvasCell } from "./CanvasCell";
 
 const GRID_SIZE = 8;
 const SURFACE_SIZE = 400;
 const CELL_SIZE = SURFACE_SIZE / GRID_SIZE;
 const PEN = "#000000";
+/** Where the surface sits in the window: off the origin on both axes. */
+const LEFT = 30;
+const TOP = 20;
 
 /**
  * jsdom performs no layout, so `getBoundingClientRect` returns an all-zero rect
- * and `usePaintGestures` bails out on it — without this the pointer tests would
- * silently paint nothing rather than fail. The spy sits on `Element.prototype`,
- * so every element reports the same geometry; `SURFACE_SIZE` and `CELL_SIZE`
+ * and `usePaintGestures` finds no cell in it — without this the pointer tests
+ * would silently paint nothing rather than fail. The spy sits on
+ * `Element.prototype`, so every element reports the same geometry; the sizes
  * exist only to give the pointer arithmetic something to resolve against.
  */
 const stubSurfaceRect = () => {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
-        x: 0,
-        y: 0,
-        top: 0,
-        left: 0,
-        right: SURFACE_SIZE,
-        bottom: SURFACE_SIZE,
+        x: LEFT,
+        y: TOP,
+        top: TOP,
+        left: LEFT,
+        right: LEFT + SURFACE_SIZE,
+        bottom: TOP + SURFACE_SIZE,
         width: SURFACE_SIZE,
         height: SURFACE_SIZE,
         toJSON: () => ({}),
@@ -45,8 +57,8 @@ const stubSurfaceRect = () => {
 
 /** The center of a cell, in the client coordinates a pointer event carries. */
 const cellPoint = (row: number, column: number) => ({
-    clientX: column * CELL_SIZE + CELL_SIZE / 2,
-    clientY: row * CELL_SIZE + CELL_SIZE / 2,
+    clientX: LEFT + column * CELL_SIZE + CELL_SIZE / 2,
+    clientY: TOP + row * CELL_SIZE + CELL_SIZE / 2,
 });
 
 const surface = () => screen.getByRole("img", { name: /^Canvas/ });
@@ -127,27 +139,14 @@ describe("rendering", () => {
         ).toBeInTheDocument();
     });
 
-    it("renders one element per grid cell", () => {
-        render(<Canvas />);
-
-        expect(cells()).toHaveLength(GRID_SIZE * GRID_SIZE);
-    });
-
-    it("rebuilds the cells when the grid size changes", () => {
-        render(<Canvas />);
-
-        act(() => actions().setGridSize(4));
-
-        expect(cells()).toHaveLength(16);
-    });
-
     it("groups the cells into one element per row", () => {
         render(<Canvas />);
 
-        const rows = Array.from(surface().children);
+        const rows = Array.from(surface().childNodes);
 
         expect(rows).toHaveLength(GRID_SIZE);
-        rows.forEach((row) => expect(row.children).toHaveLength(GRID_SIZE));
+        // Nodes, not elements: a row holds its cells and nothing else.
+        rows.forEach((row) => expect(row.childNodes).toHaveLength(GRID_SIZE));
     });
 
     it("shows the new colors in cells a resize keeps", () => {
@@ -194,15 +193,6 @@ describe("rendering", () => {
         });
     });
 
-    it("shows the color the store holds for each cell", () => {
-        render(<Canvas />);
-
-        act(() => paintStroke(3));
-
-        expect(colorAt(3)).toBe("rgb(0, 0, 0)");
-        expect(colorAt(4)).toBe("rgb(255, 255, 255)");
-    });
-
     it("toggles the grid line class on the container", () => {
         render(<Canvas />);
 
@@ -214,7 +204,194 @@ describe("rendering", () => {
     });
 });
 
+describe("rendering any sequence of changes", () => {
+    type Change =
+        | { kind: "paint"; cells: number[] }
+        | { kind: "penColor"; color: string }
+        | { kind: "fill"; cell: number }
+        | { kind: "symmetry"; axis: "topBottom" | "leftRight" }
+        | { kind: "clear" | "rotate" | "undo" | "redo" }
+        | { kind: "resize"; gridSize: number }
+        | { kind: "mount" }
+        | { kind: "unmount" };
+
+    const anyChange: fc.Arbitrary<Change> = fc.oneof(
+        {
+            arbitrary: fc.record({
+                kind: fc.constant("paint" as const),
+                cells: fc.array(fc.nat(63), { minLength: 1, maxLength: 4 }),
+            }),
+            weight: 6,
+        },
+        {
+            arbitrary: fc.record({
+                kind: fc.constant("penColor" as const),
+                color: fc.constantFrom("#000000", "#123456", BLANK_CELL_COLOR),
+            }),
+            weight: 2,
+        },
+        {
+            arbitrary: fc.record({
+                kind: fc.constant("fill" as const),
+                cell: fc.nat(63),
+            }),
+            weight: 2,
+        },
+        {
+            arbitrary: fc.record({
+                kind: fc.constant("symmetry" as const),
+                axis: fc.constantFrom(
+                    "topBottom" as const,
+                    "leftRight" as const
+                ),
+            }),
+            weight: 1,
+        },
+        {
+            arbitrary: fc.record({
+                kind: fc.constantFrom(
+                    "clear" as const,
+                    "rotate" as const,
+                    "undo" as const,
+                    "redo" as const
+                ),
+            }),
+            weight: 4,
+        },
+        {
+            arbitrary: fc.record({
+                kind: fc.constant("resize" as const),
+                gridSize: fc.integer({ min: 1, max: GRID_SIZE }),
+            }),
+            weight: 2,
+        },
+        {
+            arbitrary: fc.record({
+                kind: fc.constantFrom("mount" as const, "unmount" as const),
+            }),
+            weight: 1,
+        }
+    );
+
+    const apply = (
+        change: Exclude<Change, { kind: "mount" } | { kind: "unmount" }>,
+        cellCount: number
+    ) => {
+        const edit = actions();
+        switch (change.kind) {
+            case "paint":
+                return paintStroke(...change.cells.map((at) => at % cellCount));
+            case "penColor":
+                return edit.setPenColor(change.color);
+            case "fill":
+                return edit.fillFrom(change.cell % cellCount);
+            case "symmetry":
+                return edit.toggleSymmetry(change.axis);
+            case "clear":
+                return edit.clearCanvas();
+            case "rotate":
+                return edit.rotateCanvas();
+            case "undo":
+                return edit.undo();
+            case "redo":
+                return edit.redo();
+            case "resize":
+                return edit.setGridSize(change.gridSize);
+        }
+    };
+
+    const rgb = (color: string) => `rgb(${hexToRgb(color).join(", ")})`;
+
+    // Each cell wakes only when its own color changes, so a change the
+    // shared listener missed would leave a cell showing an old color.
+    it(
+        "shows the store's color in every cell of every canvas mounted",
+        { timeout: 15_000 },
+        () => {
+            fc.assert(
+                fc.property(
+                    fc.integer({ min: 1, max: GRID_SIZE }),
+                    fc.array(anyChange, { maxLength: 25 }),
+                    (gridSize, changes) => {
+                        resetSketchStore();
+                        actions().setGridSize(gridSize);
+                        const mounted = [render(<Canvas />)];
+
+                        try {
+                            for (const change of changes) {
+                                if (change.kind === "mount") {
+                                    mounted.push(render(<Canvas />));
+                                } else if (change.kind === "unmount") {
+                                    if (mounted.length > 1)
+                                        mounted.pop()!.unmount();
+                                } else {
+                                    act(() =>
+                                        apply(change, canvasColors().length)
+                                    );
+                                }
+
+                                const expected = canvasColors().map(rgb);
+                                for (const canvas of screen.getAllByRole(
+                                    "img",
+                                    {
+                                        name: /^Canvas/,
+                                    }
+                                )) {
+                                    const shown = Array.from(
+                                        canvas.querySelectorAll<HTMLElement>(
+                                            ":scope > * > *"
+                                        ),
+                                        (cell) => cell.style.backgroundColor
+                                    );
+                                    expect(shown).toEqual(expected);
+                                }
+                            }
+                        } finally {
+                            for (const canvas of mounted) canvas.unmount();
+                        }
+                    }
+                ),
+                { numRuns: 60 }
+            );
+        }
+    );
+});
+
 describe("render cost", () => {
+    it("lets go of the store once the last canvas unmounts", () => {
+        const subscribe = useSketchStore.subscribe;
+        let listening = 0;
+        vi.spyOn(useSketchStore, "subscribe").mockImplementation((listener) => {
+            listening++;
+            const stop = subscribe(listener);
+            return () => {
+                listening--;
+                stop();
+            };
+        });
+        const first = render(<Canvas />);
+        const second = render(<Canvas />);
+
+        first.unmount();
+        expect(listening).toBeGreaterThan(0);
+        second.unmount();
+
+        expect(listening).toBe(0);
+    });
+
+    it("wakes the cells on screen, with only some of them there", () => {
+        // A change to a cell nothing shows has no one to wake.
+        const { container } = render(<CanvasCell index={0} />);
+        const shown = () =>
+            (container.firstElementChild as HTMLElement).style.backgroundColor;
+
+        act(() => paintStroke(1));
+        expect(shown()).toBe("rgb(255, 255, 255)");
+
+        act(() => paintStroke(0));
+        expect(shown()).toBe("rgb(0, 0, 0)");
+    });
+
     it("subscribes to the store once for all its cells, not once per cell", () => {
         const subscribe = vi.spyOn(useSketchStore, "subscribe");
 
@@ -262,10 +439,11 @@ describe("render cost", () => {
 });
 
 describe("pointer painting", () => {
-    it("paints the cell under the pointer on press", () => {
+    it("paints the cell under the pointer on press, keeping the press from the browser", () => {
         render(<Canvas />);
 
-        press(1, 2);
+        // fireEvent returns false when a handler called preventDefault.
+        expect(press(1, 2)).toBe(false);
 
         expect(canvasColors()[10]).toBe(PEN);
     });
@@ -328,8 +506,14 @@ describe("pointer painting", () => {
             button: 0,
             ...cellPoint(4, 4),
         });
+        fireEvent.pointerMove(surface(), {
+            pointerId: 2,
+            buttons: 1,
+            ...cellPoint(4, 6),
+        });
 
         expect(canvasColors()[36]).toBe(BLANK_CELL_COLOR);
+        expect(canvasColors()[38]).toBe(BLANK_CELL_COLOR);
     });
 
     it("ignores non-primary buttons", () => {
@@ -412,6 +596,36 @@ describe("pointer painting", () => {
         expect(store().document.undoStack).toHaveLength(1);
         act(() => actions().undo());
         expect(isBlank()).toBe(true);
+    });
+
+    it("leaves a stroke it did not begin open when it unmounts", () => {
+        // As when another canvas is drawing: only its own stroke is this one's
+        // to commit.
+        const { unmount } = render(<Canvas />);
+        act(() => {
+            actions().beginStroke();
+            actions().paintCells([0]);
+        });
+
+        unmount();
+
+        expect(store().document.strokeBaseline).not.toBeNull();
+    });
+
+    it("stops hearing releases once unmounted", () => {
+        const added = vi.spyOn(window, "addEventListener");
+        const removed = vi.spyOn(window, "removeEventListener");
+        const { unmount } = render(<Canvas />);
+
+        unmount();
+
+        for (const type of ["pointerup", "pointercancel"]) {
+            const listener = added.mock.calls.find(
+                ([addedType]) => addedType === type
+            )?.[1];
+            expect(listener).toBeDefined();
+            expect(removed).toHaveBeenCalledWith(type, listener);
+        }
     });
 
     it("ends the stroke, painting nothing, when a move comes with no button held", () => {
@@ -499,4 +713,114 @@ describe("pointer painting", () => {
         expect(canvasColors().every((color) => color === PEN)).toBe(true);
         expect(store().document.undoStack).toHaveLength(1);
     });
+});
+
+describe("pointer painting, along any path", () => {
+    /**
+     * A whole pixel from a cell and a half off the canvas to a cell and a
+     * half past it, on either axis, weighted to the pixels either side of
+     * each edge. Whole pixels keep the model's arithmetic exact.
+     */
+    const anyOffset = fc.oneof(
+        fc.integer({
+            min: -1.5 * CELL_SIZE,
+            max: SURFACE_SIZE + 1.5 * CELL_SIZE,
+        }),
+        fc.constantFrom(
+            -1,
+            0,
+            CELL_SIZE - 1,
+            CELL_SIZE,
+            SURFACE_SIZE - 1,
+            SURFACE_SIZE
+        )
+    );
+    const anyPoint = fc.record({ x: anyOffset, y: anyOffset });
+
+    const cellAt = ({
+        x,
+        y,
+    }: {
+        x: number;
+        y: number;
+    }): CellPosition | null => {
+        const row = Math.floor(y / CELL_SIZE);
+        const column = Math.floor(x / CELL_SIZE);
+        const isOnCanvas =
+            row >= 0 && row < GRID_SIZE && column >= 0 && column < GRID_SIZE;
+
+        return isOnCanvas ? { row, column } : null;
+    };
+
+    // What the pointer crosses, worked out a second way: each run of samples
+    // on the canvas joined up, and nothing across a stretch off it.
+    it(
+        "paints the cells a drag crosses, joined within each stretch on the canvas",
+        { timeout: 15_000 },
+        () => {
+            // Mounted once: each run starts over on the same canvas, and always
+            // releases the pointer, so a failed run leaves no stroke open.
+            render(<Canvas />);
+
+            fc.assert(
+                fc.property(
+                    anyPoint,
+                    fc.array(anyPoint, { maxLength: 8 }),
+                    (start, moves) => {
+                        act(() => actions().startNewSketch());
+                        const at = ({ x, y }: { x: number; y: number }) => ({
+                            pointerId: 1,
+                            clientX: LEFT + x,
+                            clientY: TOP + y,
+                        });
+
+                        try {
+                            const expected = new Set<number>();
+                            let last = cellAt(start);
+                            const isDrawing = last !== null;
+                            if (last)
+                                expected.add(toCellIndex(last, GRID_SIZE));
+
+                            fireEvent.pointerDown(surface(), {
+                                ...at(start),
+                                button: 0,
+                            });
+                            for (const point of moves) {
+                                fireEvent.pointerMove(surface(), {
+                                    ...at(point),
+                                    buttons: 1,
+                                });
+                                const cell = isDrawing ? cellAt(point) : null;
+                                if (cell && last) {
+                                    traceLine(last, cell, (traced) =>
+                                        expected.add(
+                                            toCellIndex(traced, GRID_SIZE)
+                                        )
+                                    );
+                                } else if (cell) {
+                                    expected.add(toCellIndex(cell, GRID_SIZE));
+                                }
+                                last = cell;
+                            }
+                            release();
+
+                            const painted = canvasColors().flatMap(
+                                (color, index) => (color === PEN ? [index] : [])
+                            );
+                            expect(painted).toEqual(
+                                [...expected].sort((a, b) => a - b)
+                            );
+                            expect(store().document.undoStack).toHaveLength(
+                                expected.size > 0 ? 1 : 0
+                            );
+                            expect(store().document.strokeBaseline).toBeNull();
+                        } finally {
+                            release();
+                        }
+                    }
+                ),
+                { numRuns: 200 }
+            );
+        }
+    );
 });

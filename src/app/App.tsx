@@ -1,18 +1,24 @@
 /** @file The application shell: header, settings panel, canvas and footer. */
 
 import { Canvas } from "../ui/canvas/Canvas";
-import { useAutosave } from "../ui/files/autosave";
+import { NoticeDialog } from "../ui/common/Dialog";
+import { type Restored, useAutosave } from "../ui/files/autosave";
 import { Toolbar } from "../ui/toolbar/Toolbar";
 import { Footer } from "./Footer";
 import { Header } from "./Header";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useToolbarPopover } from "./useToolbarPopover";
 
-export const App: React.FC = () => {
+interface AppProps {
+    /** What opening learned of the saved workspace; see `restoreAutosave`. */
+    restored?: Restored;
+}
+
+export const App: React.FC<AppProps> = ({ restored }) => {
     const toolbar = useToolbarPopover();
 
     useKeyboardShortcuts();
-    useAutosave();
+    const restoreDialog = useAutosave(restored);
 
     return (
         <div className="flex h-full flex-col bg-surface font-main text-accent select-none">
@@ -31,6 +37,7 @@ export const App: React.FC = () => {
                 <Canvas />
             </main>
             <Footer />
+            {restoreDialog && <NoticeDialog {...restoreDialog} />}
         </div>
     );
 };

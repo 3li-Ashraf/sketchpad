@@ -159,17 +159,17 @@ that throws is skipped, so a broken destination cannot break the app.
 
 What is logged:
 
-| Source       | Level | Message                                      | When                                                      |
-| ------------ | ----- | -------------------------------------------- | --------------------------------------------------------- |
-| `validation` | error | invalid input refused                        | A guard refused a value, which only a bug produces        |
-| `files`      | error | save failed, export failed                   | With the cause; the user sees the failure dialog          |
-| `files`      | warn  | file could not be read                       | The browser's reason; the user sees "File unavailable"    |
-| `app`        | error | render crashed; showing the error screen     | A component threw while rendering                         |
-| `app`        | error | render crashed                               | A render error outside the error screen's reach           |
-| `app`        | warn  | render recovered from an error               | React recovered on its own                                |
-| `app`        | error | uncaught error, unhandled promise rejection  | Anything else nothing handled                             |
-| `autosave`   | warn  | autosave failed                              | Once per run of failed saves, such as a full disk         |
-| `autosave`   | warn  | autosave could not be read, autosave ignored | Opening blank: storage failed, or the record was unusable |
+| Source       | Level | Message                                      | When                                                                  |
+| ------------ | ----- | -------------------------------------------- | --------------------------------------------------------------------- |
+| `validation` | error | invalid input refused                        | A guard refused a value, which only a bug produces                    |
+| `files`      | error | save failed, export failed                   | With the cause; the user sees the failure dialog                      |
+| `files`      | warn  | file could not be read                       | The browser's reason; the user sees "File unavailable"                |
+| `app`        | error | render crashed; showing the error screen     | A component threw while rendering                                     |
+| `app`        | error | render crashed                               | A render error outside the error screen's reach                       |
+| `app`        | warn  | render recovered from an error               | React recovered on its own                                            |
+| `app`        | error | uncaught error, unhandled promise rejection  | Anything else nothing handled                                         |
+| `autosave`   | warn  | autosave failed                              | Once per run of failed saves or reads, such as a full disk            |
+| `autosave`   | warn  | autosave could not be read, autosave ignored | Opening blank: storage failed or was late, or the record was unusable |
 
 A bad file the decoder refuses is not logged: that is the user's file, not a
 fault, and the dialog already explains it.
@@ -285,6 +285,25 @@ can turn those questions back on, so keeping them would make them permanent.
   there by other code, so `decodeAutosave` checks every part and rebuilds it
   from what passed. Nothing saved, a record it cannot use, or storage that
   gives no answer within 2 s: the page opens blank, with a warning in the log.
+- **Never over an unseen save:** a page writes only once it has seen what the
+  device holds. When storage failed or was late at opening, `restoreAutosave`
+  says so (`Restored`), and `App` hands that to `useAutosave`, which holds its
+  writes and reads the device first: the late answer if it comes, or a fresh
+  read before the first write. A saved drawing found then goes on the canvas
+  if nothing has been drawn since. If something has, keeping either drawing
+  erases the other, so the user is asked: Restore saved drawing, or Keep this
+  drawing, which writes it at once. Without this, the first edit on a page
+  that opened blank would silently replace the saved drawing. `Restored` lives
+  outside React, so the rule holds when a crash remounts the app.
+- **Other tabs:** every tab shares the one record, so a tab left open with an
+  older drawing would otherwise write it over newer work the moment it was
+  used. After each save a tab announces it on a `BroadcastChannel`
+  (`openAutosaveChannel`). A tab that hears one, with nothing of its own
+  waiting to be written and no stroke open, reads the record and takes it
+  up, which is no change of its own to write back. A page restored from the
+  back-forward cache, which may have missed announcements, does the same.
+  Two tabs edited within the same half second is the one case left: the
+  later save wins, and the other tab then takes it up.
 
 ## Dialogs
 
@@ -415,7 +434,9 @@ The browser project exists because jsdom cannot prove these properties:
 - Save sketch and Export PNG write real files that decode to the drawing. That
   also shows that revoking the object URL right after the click is safe.
 - A real drop opens the file and keeps the page, and the whole workspace
-  survives a round trip through real IndexedDB.
+  survives a round trip through real IndexedDB. A save announced on the
+  browser's own `BroadcastChannel` is heard, and taken up, by another
+  channel on the page, as another tab's would be.
 - The whole app fits a 320 px screen without scrolling sideways, with a
   square canvas, and the settings panel, whose heights are fixed, holds every
   control at each breakpoint.
@@ -454,4 +475,4 @@ follow the base path rather than restating it.
 
 React and the icon set change only on a dependency upgrade, so they build into
 their own content-hashed `vendor` chunk (about 63 kB gzipped). An app-only
-deploy invalidates just the app chunk, about 8 kB gzipped.
+deploy invalidates just the app chunk, about 12.5 kB gzipped.

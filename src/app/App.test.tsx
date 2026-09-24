@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -6,12 +12,15 @@ import {
     BLANK_CELL_COLOR,
     createBlankGrid,
     DEFAULT_GRID_SIZE,
+    NO_SYMMETRY,
 } from "../domain/grid";
 import { DEFAULT_PEN_COLOR } from "../domain/tools";
+import type { Workspace } from "../domain/workspace";
 import { readAutosave } from "../io/autosave";
 import { selectWorkspace } from "../state/sketchStore";
 import { deleteAutosaveDatabase } from "../test/autosaveDatabase";
 import { canvasColors, paintStroke, store } from "../test/storeHelpers";
+import type { Restored } from "../ui/files/autosave";
 import { App } from "./App";
 
 const toggle = () => screen.getByRole("button", { name: "Settings" });
@@ -236,5 +245,41 @@ describe("keyboard shortcuts", () => {
         await userEvent.keyboard("{Control>}z{/Control}");
 
         expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
+    });
+});
+
+describe("autosave", () => {
+    it("asks over the app when a drawing saved earlier turns up after drawing began", async () => {
+        let answer!: (workspace: Workspace | null) => void;
+        const restored: Restored = {
+            isKnown: false,
+            answer: new Promise((resolve) => (answer = resolve)),
+        };
+        render(<App restored={restored} />);
+        paintStroke(0);
+
+        await act(async () => {
+            answer({
+                document: {
+                    gridSize: 2,
+                    colors: ["#123456", ...createBlankGrid(2).slice(1)],
+                    undoStack: [],
+                    redoStack: [],
+                },
+                settings: {
+                    tool: "pen",
+                    penColor: DEFAULT_PEN_COLOR,
+                    symmetry: NO_SYMMETRY,
+                    showGridLines: true,
+                },
+            });
+            await restored.answer;
+        });
+
+        expect(
+            screen.getByRole("alertdialog", {
+                name: "Restore your saved drawing?",
+            })
+        ).toBeInTheDocument();
     });
 });

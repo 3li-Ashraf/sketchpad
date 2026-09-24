@@ -22,13 +22,14 @@ import { restoreAutosave } from "./ui/files/autosave";
 installGlobalErrorHandlers();
 
 // Before the first render, so the page opens on the saved drawing rather than
-// flashing a blank one. It gives up after a moment if storage does not answer.
-await restoreAutosave();
+// flashing a blank one. It gives up after a moment if storage does not answer,
+// and autosave then holds its writes until it has.
+const restored = await restoreAutosave();
 
 createRoot(document.getElementById("root")!, reactErrorHandlers).render(
     <StrictMode>
         <ErrorBoundary>
-            <App />
+            <App restored={restored} />
         </ErrorBoundary>
     </StrictMode>
 );

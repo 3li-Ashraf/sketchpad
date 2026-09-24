@@ -7,11 +7,22 @@
 import "../../styles/index.css";
 
 import { render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+    afterEach,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    onTestFinished,
+} from "vitest";
 import { commands, userEvent } from "vitest/browser";
 
 import { createBlankGrid } from "../../domain/grid";
-import { readAutosave } from "../../io/autosave";
+import {
+    openAutosaveChannel,
+    readAutosave,
+    writeAutosave,
+} from "../../io/autosave";
 import { decodeSketch, encodeSketch } from "../../io/sketchFile";
 import { selectSketch, selectWorkspace } from "../../state/sketchStore";
 import { deleteAutosaveDatabase } from "../../test/autosaveDatabase";
@@ -114,5 +125,22 @@ describe("autosave in a real browser", () => {
         await restoreAutosave();
 
         expect(selectWorkspace(store())).toEqual(before);
+    });
+
+    it("takes up what another tab saves, through the browser's own channel", async () => {
+        // Drawn and saved before this tab mounts, so it has nothing of its
+        // own waiting, which would win instead.
+        actions().setGridSize(4);
+        paintStroke(5);
+        const saved = selectWorkspace(store());
+        await writeAutosave(saved);
+        actions().setGridSize(8);
+        render(<Autosaving />);
+        const otherTab = openAutosaveChannel(() => {});
+        onTestFinished(otherTab.close);
+
+        otherTab.announce();
+
+        await expect.poll(() => selectWorkspace(store())).toEqual(saved);
     });
 });

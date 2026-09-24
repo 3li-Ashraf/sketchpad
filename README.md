@@ -25,7 +25,9 @@ Tailwind CSS. It runs at <https://3li-ashraf.github.io/sketchpad>.
 - **Drag and drop**: drop a `.skpd` file anywhere on the page to open it.
 - **Autosave**: the drawing, its whole undo history and the settings are kept
   in the browser on this device, and come back after a reload, a closed tab
-  or a crash.
+  or a crash. Open tabs keep in step, so one left behind never writes an
+  older drawing over newer work, and a saved drawing that is slow to load is
+  never erased unasked.
 - **No lost work**: resizing the grid, opening a file or starting a new
   sketch asks first whenever it would erase a drawing. "Don't ask again" lasts until the page is reloaded.
 

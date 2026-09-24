@@ -8,13 +8,17 @@
  * each other, the user chooses. Tabs also tell each other when they save, and
  * a tab with nothing of its own waiting to be written takes up what another
  * saved, so a tab left behind cannot later write its older drawing over the
- * newer one.
+ * newer one. New sketch empties the device at once (`clearSavedWorkspace`),
+ * and the other tabs start over with it.
  */
 
 import { isStrokeOpen } from "../../domain/sketchDocument";
 import type { Workspace } from "../../domain/workspace";
-import { readAutosave, writeAutosave } from "../../io/autosave";
-import { openAutosaveChannel } from "../../io/autosaveChannel";
+import { clearAutosave, readAutosave, writeAutosave } from "../../io/autosave";
+import {
+    type AutosaveNews,
+    openAutosaveChannel,
+} from "../../io/autosaveChannel";
 import { createLogger } from "../../log/logger";
 import {
     selectHasWorkToLose,
@@ -52,6 +56,17 @@ export interface Question {
     keep: () => void;
 }
 
+/** The running session's `clear`, which `clearSavedWorkspace` reaches. */
+let clearRunning: (() => void) | null = null;
+
+/**
+ * Empties the device of the saved workspace at once, as New sketch does. Call
+ * it once the store holds the new sketch: the session then drops the write
+ * that change scheduled, which would otherwise put a record back. With no
+ * session running, as in tests of the toolbar alone, it does nothing.
+ */
+export const clearSavedWorkspace = (): void => clearRunning?.();
+
 /**
  * Saves as `useAutosave` describes, until the returned function stops it. The
  * page's knowledge of the device is kept on `restored`; everything else here
@@ -75,32 +90,38 @@ export const startAutosave = (
     // Set while the store is given what the device holds, which is no
     // change to write back.
     let isAdopting = false;
-    // Saves other tabs have announced, so a read begun before the latest one
-    // is known to be out of date.
-    let savesHeard = 0;
+    // Saves and clears announced by other tabs, or made by this one's New
+    // sketch, so a read begun before the latest is known to be out of date.
+    let changesHeard = 0;
 
     const fail = (error: unknown) => {
         if (!isFailing) log.warn("autosave failed", { error });
         isFailing = true;
     };
 
-    const adopt = (workspace: Workspace) => {
+    /** Brings the store in line with the device, which is nothing to write. */
+    const takeUp = (change: () => void) => {
         clearTimeout(timer);
         isPending = false;
         isAdopting = true;
         try {
-            useSketchStore.getState().actions.restoreWorkspace(workspace);
+            change();
         } finally {
             isAdopting = false;
         }
     };
+
+    const adopt = (workspace: Workspace) =>
+        takeUp(() =>
+            useSketchStore.getState().actions.restoreWorkspace(workspace)
+        );
 
     /** Reads the device, and again if another tab saves in the meantime. */
     const readDevice = (
         settle: (workspace: Workspace | null) => void,
         answer = readAutosave()
     ): void => {
-        const heard = savesHeard;
+        const heard = changesHeard;
         isReading = true;
 
         answer.then(
@@ -110,7 +131,7 @@ export const startAutosave = (
                 if (restored.answer === answer) restored.answer = null;
 
                 isFailing = false;
-                if (savesHeard === heard) settle(workspace);
+                if (changesHeard === heard) settle(workspace);
                 else readDevice(settle);
             },
             (error: unknown) => {
@@ -136,7 +157,27 @@ export const startAutosave = (
         isPending = false;
         writeAutosave(workspaceOf(useSketchStore.getState())).then(() => {
             isFailing = false;
-            if (!isStopped) channel.announce();
+            if (!isStopped) channel.announce("saved");
+        }, fail);
+    };
+
+    /**
+     * Empties the device, as New sketch asks: the drawing leaves the device
+     * now, not when the next save would have replaced it, and nothing more is
+     * written until something changes. A drawing this page has not seen is
+     * not its to erase, so until it has, the new sketch waits like any other
+     * change.
+     */
+    const clear = () => {
+        if (isStopped || !restored.isKnown) return;
+
+        clearTimeout(timer);
+        isPending = false;
+        // A read begun before now would bring back what is being cleared.
+        changesHeard++;
+        clearAutosave().then(() => {
+            isFailing = false;
+            if (!isStopped) channel.announce("cleared");
         }, fail);
     };
 
@@ -175,7 +216,7 @@ export const startAutosave = (
             return;
         }
 
-        const heard = savesHeard;
+        const heard = changesHeard;
         const answered = (choice: () => void) => () => {
             isAsking = false;
             ask(null);
@@ -188,7 +229,7 @@ export const startAutosave = (
                 adopt(workspace);
                 know();
                 // A tab that saved while the question was up saved later.
-                if (savesHeard !== heard) takeUpSaved();
+                if (changesHeard !== heard) takeUpSaved();
             }),
             // Written at once: this drawing is the one to keep.
             keep: answered(() => {
@@ -198,14 +239,28 @@ export const startAutosave = (
         });
     };
 
-    const hearSave = () => {
-        if (isStopped) return;
+    /**
+     * Another tab started a new sketch, so this one does too, keeping its own
+     * size and settings, unless it has changes of its own to write, which
+     * then win.
+     */
+    const takeUpClear = () => {
+        const { document, actions } = useSketchStore.getState();
+        if (!restored.isKnown || isPending || isStrokeOpen(document)) return;
 
-        savesHeard++;
-        takeUpSaved();
+        takeUp(actions.startNewSketch);
     };
 
-    const channel = openAutosaveChannel(hearSave);
+    const hear = (news: AutosaveNews) => {
+        if (isStopped) return;
+
+        changesHeard++;
+        if (news === "cleared") takeUpClear();
+        else takeUpSaved();
+    };
+
+    const channel = openAutosaveChannel(hear);
+    clearRunning = clear;
 
     const unsubscribe = useSketchStore.subscribe((next, previous) => {
         if (isAdopting) return;
@@ -225,7 +280,7 @@ export const startAutosave = (
     // Back from the back-forward cache, a page may have missed saves made
     // while it was away.
     const catchUp = (event: PageTransitionEvent) => {
-        if (event.persisted) hearSave();
+        if (event.persisted) hear("saved");
     };
 
     document.addEventListener("visibilitychange", saveIfHidden);
@@ -248,5 +303,6 @@ export const startAutosave = (
         isStopped = true;
         save();
         channel.close();
+        if (clearRunning === clear) clearRunning = null;
     };
 };

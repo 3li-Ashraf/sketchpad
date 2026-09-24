@@ -13,8 +13,8 @@ Tailwind CSS. It runs at <https://3li-ashraf.github.io/sketchpad>.
 - **Rotate**: turn the whole drawing a quarter turn clockwise; Undo turns it
   back.
 - **New sketch**: start over on a blank canvas of the same size. Clear
-  canvas can be undone; New sketch also erases the undo history, including the
-  copy autosaved on the device.
+  canvas can be undone; New sketch also erases the undo history, and clears
+  the copy autosaved on the device at once. Other open tabs start over too.
 - **History**: undo and redo a whole stroke at a time, up to 100 steps.
   <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes; <kbd>Ctrl</kbd>+<kbd>Y</kbd> or
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes (<kbd>Cmd</kbd> on

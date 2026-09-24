@@ -8,18 +8,17 @@ import {
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-    BLANK_CELL_COLOR,
-    createBlankGrid,
-    DEFAULT_GRID_SIZE,
-    NO_SYMMETRY,
-} from "../domain/grid";
+import { BLANK_CELL_COLOR, createBlankGrid, NO_SYMMETRY } from "../domain/grid";
 import { DEFAULT_PEN_COLOR } from "../domain/tools";
 import type { Workspace } from "../domain/workspace";
 import { readAutosave } from "../io/autosave";
 import { workspaceOf } from "../state/sketchStore";
-import { deleteAutosaveDatabase } from "../test/autosaveDatabase";
+import {
+    deleteAutosaveDatabase,
+    readStoredRecord,
+} from "../test/autosaveDatabase";
 import { canvasColors, paintStroke, store } from "../test/storeHelpers";
+import { AUTOSAVE_DELAY } from "../ui/autosave/autosaveSession";
 import type { Restored } from "../ui/autosave/restoreAutosave";
 import { App } from "./App";
 
@@ -48,7 +47,7 @@ describe("shell", () => {
         expect(canvas()).toBeInTheDocument();
     });
 
-    it("removes a drawing from the device on New sketch", async () => {
+    it("clears the device the moment New sketch is confirmed", async () => {
         await deleteAutosaveDatabase();
         render(<App />);
         paintStroke(0);
@@ -63,16 +62,14 @@ describe("shell", () => {
         await userEvent.click(
             screen.getByRole("button", { name: "Start new sketch" })
         );
-        window.dispatchEvent(new Event("pagehide"));
 
+        // No page hidden and no autosave delay waited out: the store is
+        // emptied at once, and stays empty until something changes.
         await waitFor(async () =>
-            expect((await readAutosave())?.document).toEqual({
-                gridSize: DEFAULT_GRID_SIZE,
-                colors: createBlankGrid(DEFAULT_GRID_SIZE),
-                undoStack: [],
-                redoStack: [],
-            })
+            expect(await readStoredRecord()).toBeUndefined()
         );
+        await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_DELAY));
+        expect(await readStoredRecord()).toBeUndefined();
     });
 
     it("autosaves what is drawn", async () => {

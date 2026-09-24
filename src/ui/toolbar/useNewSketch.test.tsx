@@ -5,7 +5,7 @@
 
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createBlankGrid } from "../../domain/grid";
 import { selectCanUndo } from "../../state/sketchStore";
@@ -22,12 +22,58 @@ import {
     paintStroke,
     store,
 } from "../../test/storeHelpers";
+import { clearSavedWorkspace } from "../autosave/autosaveSession";
 import { Toolbar } from "./Toolbar";
 import { NEW_SKETCH_DIALOG_TITLE, NEW_SKETCH_WARNING } from "./useNewSketch";
 
+// The session is tested in `useAutosave.test`; here only the call is watched.
+vi.mock("../autosave/autosaveSession", { spy: true });
+
 const renderToolbar = () => render(<Toolbar isOpen />);
 
+/** Whether the canvas was blank each time the device was asked to clear. */
+const blankAtEachClear = () => {
+    const seen: boolean[] = [];
+    vi.mocked(clearSavedWorkspace).mockImplementation(() => {
+        seen.push(isCanvasBlank());
+    });
+
+    return seen;
+};
+
 describe("New sketch", () => {
+    it("clears the device, once the canvas holds the new sketch", async () => {
+        renderToolbar();
+        const seen = blankAtEachClear();
+        paintStroke(0);
+
+        await userEvent.click(button("New sketch"));
+        await userEvent.click(button("Start new sketch"));
+
+        // Cleared after starting over, so the session drops the save that
+        // starting over scheduled.
+        expect(seen).toEqual([true]);
+    });
+
+    it("clears the device without asking when there is nothing to lose", async () => {
+        renderToolbar();
+        const seen = blankAtEachClear();
+
+        await userEvent.click(button("New sketch"));
+
+        expect(seen).toEqual([true]);
+    });
+
+    it("leaves the device alone when cancelled", async () => {
+        renderToolbar();
+        paintStroke(0);
+
+        await userEvent.click(button("New sketch"));
+        await userEvent.click(button("Cancel"));
+
+        expect(clearSavedWorkspace).not.toHaveBeenCalled();
+    });
+
     it("asks nothing when there is nothing to lose", async () => {
         renderToolbar();
         const before = store().document;

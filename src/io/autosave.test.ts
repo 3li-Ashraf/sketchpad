@@ -14,6 +14,7 @@ import { expectLogged } from "../test/logCapture";
 import {
     AUTOSAVE_VERSION,
     type AutosaveRecord,
+    clearAutosave,
     decodeAutosave,
     encodeAutosave,
     readAutosave,
@@ -137,6 +138,28 @@ describe("autosave storage", () => {
             message: "IndexedDB request failed",
             cause: failed,
         });
+    });
+
+    it("clears the store, leaving nothing to read", async () => {
+        await writeAutosave(workspace());
+
+        await clearAutosave();
+
+        expect(await readStoredRecord()).toBeUndefined();
+        expect(await readAutosave()).toBeNull();
+    });
+
+    it("rejects when the browser aborts the clear", async () => {
+        vi.spyOn(IDBObjectStore.prototype, "clear").mockImplementation(
+            function (this: IDBObjectStore) {
+                this.transaction.abort();
+                return {} as IDBRequest<undefined>;
+            }
+        );
+
+        await expect(clearAutosave()).rejects.toThrow(
+            "Autosave was not cleared"
+        );
     });
 
     it("rejects when the browser aborts the write", async () => {

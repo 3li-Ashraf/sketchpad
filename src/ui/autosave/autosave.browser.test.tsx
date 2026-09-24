@@ -13,12 +13,16 @@ import {
     onTestFinished,
 } from "vitest";
 
+import { BLANK_CELL_COLOR } from "../../domain/grid";
 import { readAutosave, writeAutosave } from "../../io/autosave";
 import { openAutosaveChannel } from "../../io/autosaveChannel";
 import { workspaceOf } from "../../state/sketchStore";
-import { deleteAutosaveDatabase } from "../../test/autosaveDatabase";
+import {
+    deleteAutosaveDatabase,
+    readStoredRecord,
+} from "../../test/autosaveDatabase";
 import { actions, paintStroke, store } from "../../test/storeHelpers";
-import { AUTOSAVE_DELAY } from "./autosaveSession";
+import { AUTOSAVE_DELAY, clearSavedWorkspace } from "./autosaveSession";
 import { restoreAutosave } from "./restoreAutosave";
 import { useAutosave } from "./useAutosave";
 
@@ -66,8 +70,36 @@ describe("autosave in a real browser", () => {
         const otherTab = openAutosaveChannel(() => {});
         onTestFinished(otherTab.close);
 
-        otherTab.announce();
+        otherTab.announce("saved");
 
         await expect.poll(() => workspaceOf(store())).toEqual(saved);
+    });
+
+    it("empties real IndexedDB the moment a new sketch starts", async () => {
+        render(<Autosaving />);
+        paintStroke(0);
+        window.dispatchEvent(new Event("pagehide"));
+        await expect.poll(readStoredRecord).toBeDefined();
+
+        actions().startNewSketch();
+        clearSavedWorkspace();
+
+        await expect
+            .poll(readStoredRecord, { timeout: AUTOSAVE_DELAY / 2 })
+            .toBeUndefined();
+    });
+
+    it("starts over when another tab clears, through the browser's own channel", async () => {
+        render(<Autosaving />);
+        paintStroke(0);
+        window.dispatchEvent(new Event("pagehide"));
+        await expect.poll(readStoredRecord).toBeDefined();
+        const otherTab = openAutosaveChannel(() => {});
+        onTestFinished(otherTab.close);
+
+        otherTab.announce("cleared");
+
+        await expect.poll(() => store().document.undoStack).toEqual([]);
+        expect(store().document.colors[0]).toBe(BLANK_CELL_COLOR);
     });
 });

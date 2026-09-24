@@ -175,7 +175,7 @@ What is logged:
 | `app`        | error | render crashed                               | A render error outside the error screen's reach                       |
 | `app`        | warn  | render recovered from an error               | React recovered on its own                                            |
 | `app`        | error | uncaught error, unhandled promise rejection  | Anything else nothing handled                                         |
-| `autosave`   | warn  | autosave failed                              | Once per run of failed saves or reads, such as a full disk            |
+| `autosave`   | warn  | autosave failed                              | Once per run of failed saves, clears or reads, such as a full disk    |
 | `autosave`   | warn  | autosave could not be read, autosave ignored | Opening blank: storage failed or was late, or the record was unusable |
 
 A bad file the decoder refuses is not logged: that is the user's file, not a
@@ -258,7 +258,8 @@ one undo away from its drawing.
 - **New sketch** (`ui/toolbar/useNewSketch.ts`): a blank canvas at the same
   size, with no history. Clear canvas is an undo step, so it asks nothing, but
   it leaves the drawing one undo away, in memory and in the autosave; New
-  sketch is how a drawing leaves the device.
+  sketch is how a drawing leaves the device. It clears the autosave at once
+  (see [Autosave](#autosave)).
 
 "Don't ask again" sets a flag in the store, which is not autosaved, so it
 lasts until the page is reloaded.
@@ -316,13 +317,23 @@ can turn those questions back on, so keeping them would make them permanent.
   outside React, so the rule holds when a crash remounts the app.
 - **Other tabs:** every tab shares the one record, so a tab left open with an
   older drawing would otherwise write it over newer work the moment it was
-  used. After each save a tab announces it on a `BroadcastChannel`
-  (`io/autosaveChannel.ts`). A tab that hears one, with nothing of its own
-  waiting to be written and no stroke open, reads the record and takes it
-  up, which is no change of its own to write back. A page restored from the
-  back-forward cache, which may have missed announcements, does the same.
-  Two tabs edited within the same half second is the one case left: the
-  later save wins, and the other tab then takes it up.
+  used. After each save or clear a tab announces it on a `BroadcastChannel`
+  (`io/autosaveChannel.ts`). A tab that hears of a save, with nothing of its
+  own waiting to be written and no stroke open, reads the record and takes it
+  up, which is no change of its own to write back; one that hears of a clear
+  starts a new sketch itself, keeping its size and settings. A page restored
+  from the back-forward cache, which may have missed announcements, reads the
+  record as if it had heard of a save. Two tabs edited within the same half
+  second is the one case left: the later save wins, and the other tab then
+  takes it up.
+- **New sketch clears the device:** it empties the store at once
+  (`clearAutosave`), rather than leave the drawing there until the next save
+  would replace it, so a crash or a power cut a moment later cannot bring it
+  back. `useNewSketch` starts the new sketch in the store first and then
+  calls `clearSavedWorkspace`, and the session drops the write that change
+  scheduled, so nothing is written until something else changes; a reload
+  before then opens a default blank page. A page that has not seen the
+  device leaves it alone, since the drawing there is not one it showed.
 
 ## Dialogs
 

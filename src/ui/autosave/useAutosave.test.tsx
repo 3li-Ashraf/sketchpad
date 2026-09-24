@@ -22,11 +22,17 @@ import {
 } from "../../domain/grid";
 import { DEFAULT_PEN_COLOR } from "../../domain/tools";
 import type { Workspace } from "../../domain/workspace";
-import { encodeAutosave, readAutosave, writeAutosave } from "../../io/autosave";
+import {
+    clearAutosave,
+    encodeAutosave,
+    readAutosave,
+    writeAutosave,
+} from "../../io/autosave";
 import { openAutosaveChannel } from "../../io/autosaveChannel";
 import { workspaceOf } from "../../state/sketchStore";
 import {
     deleteAutosaveDatabase,
+    readStoredRecord,
     writeStoredRecord,
 } from "../../test/autosaveDatabase";
 import { deferred } from "../../test/deferred";
@@ -34,7 +40,7 @@ import { expectLogged } from "../../test/logCapture";
 import { button, expectNoDialog } from "../../test/queries";
 import { actions, paintStroke, store } from "../../test/storeHelpers";
 import { NoticeDialog } from "../common/Dialog";
-import { AUTOSAVE_DELAY } from "./autosaveSession";
+import { AUTOSAVE_DELAY, clearSavedWorkspace } from "./autosaveSession";
 import {
     RESTORE_TIMEOUT,
     restoreAutosave,
@@ -52,6 +58,7 @@ beforeEach(async () => {
     // test told them to return, so each starts again from the real one.
     vi.mocked(readAutosave).mockReset();
     vi.mocked(writeAutosave).mockReset();
+    vi.mocked(clearAutosave).mockReset();
 
     await deleteAutosaveDatabase();
 });
@@ -103,7 +110,7 @@ const saveInAnotherTab = async (workspace: Workspace) => {
 
     const channel = openAutosaveChannel(() => {});
     onTestFinished(channel.close);
-    channel.announce();
+    channel.announce("saved");
 
     await vi.waitFor(() =>
         expect(vi.mocked(readAutosave).mock.calls.length).toBeGreaterThan(
@@ -289,12 +296,14 @@ const lastRead = () =>
         .value as Promise<Workspace | null>;
 
 /**
- * Tells the mounted autosave that another tab has saved, as its channel
- * would. The real channel is tested in `io/autosave.test`, and end to end in
- * "hears another tab through the channel" below.
+ * Tells the mounted autosave that another tab has saved, or cleared, as its
+ * channel would. The real channel is tested in `io/autosaveChannel.test`, and
+ * end to end in "hears another tab through the channel" below.
  */
-const hearSaveElsewhere = () =>
-    act(() => vi.mocked(openAutosaveChannel).mock.calls.at(-1)![0]());
+const hearElsewhere = (news: "saved" | "cleared") =>
+    act(() => vi.mocked(openAutosaveChannel).mock.calls.at(-1)![0](news));
+
+const hearSaveElsewhere = () => hearElsewhere("saved");
 
 describe("useAutosave when opening could not read the device", () => {
     useFakeTimers();
@@ -648,8 +657,173 @@ describe("useAutosave with other tabs", () => {
         const hear = vi.mocked(openAutosaveChannel).mock.calls[0][0];
         unmount();
 
-        hear();
+        hear("saved");
 
         expect(readAutosave).not.toHaveBeenCalled();
+    });
+});
+
+describe("useAutosave on a new sketch", () => {
+    useFakeTimers();
+
+    /** Starts over as New sketch does: the store first, then the device. */
+    const startOver = async () => {
+        actions().startNewSketch();
+        clearSavedWorkspace();
+        await vi.mocked(clearAutosave).mock.results.at(-1)?.value;
+    };
+
+    /** A drawing on the canvas, written to the device, with nothing waiting. */
+    const drawnAndSaved = async () => {
+        render(<Autosaving />);
+        paintStroke(0);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        await vi.mocked(writeAutosave).mock.results[0].value;
+        expect(await readStoredRecord()).toBeDefined();
+    };
+
+    it("empties the device at once, and writes nothing after", async () => {
+        await drawnAndSaved();
+
+        await startOver();
+
+        expect(await readStoredRecord()).toBeUndefined();
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        expect(writes()).toBe(1);
+        expect(await readStoredRecord()).toBeUndefined();
+    });
+
+    it("drops a save of the drawing that had not been written yet", async () => {
+        await keepOnDevice(EARLIER);
+        render(<Autosaving />);
+        paintStroke(0);
+
+        await startOver();
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+
+        expect(writes()).toBe(0);
+        expect(await readStoredRecord()).toBeUndefined();
+    });
+
+    it("writes again at the next change", async () => {
+        await drawnAndSaved();
+        await startOver();
+
+        actions().setTool("eraser");
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        await vi.mocked(writeAutosave).mock.results.at(-1)!.value;
+
+        expect(await saved()).toEqual(workspaceOf(store()));
+    });
+
+    it("leaves alone a saved drawing the page has not seen", async () => {
+        await keepOnDevice(EARLIER);
+        render(<Autosaving restored={{ isKnown: false, answer: null }} />);
+        paintStroke(0);
+
+        await startOver();
+
+        expect(clearAutosave).not.toHaveBeenCalled();
+        expect(await saved()).toEqual(EARLIER);
+    });
+
+    it("tells the other tabs once it has cleared", async () => {
+        await drawnAndSaved();
+        const news = vi.fn();
+        const otherTab = openAutosaveChannel(news);
+        onTestFinished(otherTab.close);
+
+        await startOver();
+
+        await vi.waitFor(() =>
+            expect(news).toHaveBeenLastCalledWith("cleared")
+        );
+    });
+
+    it("warns when the device cannot be cleared", async () => {
+        await drawnAndSaved();
+        vi.mocked(clearAutosave).mockRejectedValueOnce(new Error("denied"));
+
+        await startOver().catch(() => {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        expectLogged("warn", "autosave", "autosave failed");
+    });
+
+    it("does nothing with no autosave running", () => {
+        clearSavedWorkspace();
+
+        expect(clearAutosave).not.toHaveBeenCalled();
+    });
+
+    it("does not bring back a save it was reading when it cleared", async () => {
+        await drawnAndSaved();
+        const outdated = deferred<Workspace | null>();
+        vi.mocked(readAutosave).mockReturnValueOnce(outdated.promise);
+        hearSaveElsewhere();
+
+        await startOver();
+        outdated.resolve(EARLIER);
+        await vi.waitFor(() => expect(readAutosave).toHaveBeenCalledTimes(2));
+        await lastRead();
+
+        expect(store().document.colors[0]).toBe(BLANK_CELL_COLOR);
+        expect(store().document.undoStack).toEqual([]);
+    });
+});
+
+describe("useAutosave when another tab starts a new sketch", () => {
+    useFakeTimers();
+
+    it("starts over too, keeping its size and settings, and writes nothing", async () => {
+        render(<Autosaving />);
+        actions().setGridSize(8);
+        actions().setTool("eraser");
+        paintStroke(0);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+
+        hearElsewhere("cleared");
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+
+        expect(store().document).toMatchObject({
+            gridSize: 8,
+            colors: createBlankGrid(8),
+            undoStack: [],
+        });
+        expect(store().tool).toBe("eraser");
+        expect(writes()).toBe(1);
+    });
+
+    it("keeps its own drawing when it has not been written yet", async () => {
+        render(<Autosaving />);
+        paintStroke(0);
+
+        hearElsewhere("cleared");
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+
+        // The later edit wins, and the other tab takes it up in turn.
+        expect(store().document.colors[0]).toBe(DEFAULT_PEN_COLOR);
+        expect(writes()).toBe(1);
+    });
+
+    it("leaves a stroke in progress alone", () => {
+        render(<Autosaving />);
+        actions().beginStroke();
+        actions().paintCells([0]);
+
+        hearElsewhere("cleared");
+
+        expect(store().document.strokeBaseline).not.toBeNull();
+        expect(store().document.colors[0]).toBe(DEFAULT_PEN_COLOR);
+    });
+
+    it("leaves a page that has not seen the device to read it first", () => {
+        render(<Autosaving restored={{ isKnown: false, answer: null }} />);
+        paintStroke(0);
+        const before = store().document;
+
+        hearElsewhere("cleared");
+
+        expect(store().document).toBe(before);
     });
 });

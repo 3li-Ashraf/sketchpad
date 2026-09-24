@@ -1,7 +1,7 @@
 {
   "name": "Sketchpad",
   "short_name": "Sketchpad",
-  "description": "A pixel-art drawing app with pen, eraser, fill and mirroring tools.",
+  "description": "A pixel-art editor in the browser: pen, colorful pen, eraser, fill and symmetry, with undo and autosave.",
   "start_url": "../../",
   "scope": "../../",
   "display": "standalone",

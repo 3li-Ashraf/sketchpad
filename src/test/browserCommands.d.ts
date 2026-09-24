@@ -17,5 +17,8 @@ declare module "vitest/browser" {
             to: { x: number; y: number },
             steps?: number
         ) => Promise<void>;
+        setMotionPreference: (
+            preference: "reduce" | "no-preference" | "default"
+        ) => Promise<void>;
     }
 }

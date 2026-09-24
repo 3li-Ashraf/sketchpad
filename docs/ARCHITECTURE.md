@@ -427,7 +427,10 @@ turns words that happen to be utility names into CSS no element uses.
   swatch, the settings toggle, and, through `TextButton`, the buttons of the
   dialogs and the error screen. Its pressed and expanded states are read from
   `aria-pressed` and `aria-expanded`, so the look cannot disagree with what
-  assistive technology is told.
+  assistive technology is told. Keyboard focus shows the browser's own ring;
+  the swatch, whose input is transparent, wears it on its outline instead.
+- The settings icon spins only for users who have not asked for reduced
+  motion (`motion-safe:`), since it never stops.
 - Tooltips are CSS drawn from a `data-tooltip` attribute, shown on hover only
   where the device can hover, and on keyboard focus only. In the toolbar's two
   columns each label opens toward the other column, since one centered on its
@@ -471,6 +474,9 @@ The browser project exists because jsdom cannot prove these properties:
   survives a round trip through real IndexedDB. A save announced on the
   browser's own `BroadcastChannel` is heard, and taken up, by another
   channel on the page, as another tab's would be.
+- The settings icon stays still for a user who asks for reduced motion, and
+  the color swatch shows a focus ring when the keyboard reaches it
+  (`setMotionPreference` emulates the preference through Playwright).
 - The whole app fits a 320 px screen without scrolling sideways, with a
   square canvas, and the settings panel, whose heights are fixed, holds every
   control at each breakpoint.

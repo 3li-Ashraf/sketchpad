@@ -74,6 +74,12 @@
     cursor: default;
   }
 
+  /* The swatch's own input is transparent, and so is the focus ring the
+     browser draws on it; the swatch around it wears the ring instead. */
+  .control:has(> input:focus-visible) {
+    outline: auto;
+  }
+
   /* The native range input, restyled. The fill is a hard gradient stop at
      `--slider-progress` (0..1, set by the component), inset by half a thumb
      at each end so it meets the thumb's center. */

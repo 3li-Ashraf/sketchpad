@@ -12,7 +12,7 @@ import "../styles/index.css";
 
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { page, userEvent } from "vitest/browser";
+import { commands, page, userEvent } from "vitest/browser";
 
 import { App } from "./App";
 
@@ -66,4 +66,46 @@ describe("the settings panel", () => {
             expect(panel.scrollHeight).toBeLessThanOrEqual(panel.clientHeight);
         }
     );
+});
+
+describe("motion and focus", () => {
+    afterEach(async () => {
+        await commands.setMotionPreference("default");
+    });
+
+    it("keeps the settings icon still for a user who asks for less motion", async () => {
+        await page.viewport(375, 700);
+        await commands.setMotionPreference("reduce");
+        render(<App />);
+
+        const icon = screen.getByRole("button", {
+            name: "Settings",
+        }).firstElementChild!;
+
+        expect(getComputedStyle(icon).animationName).toBe("none");
+    });
+
+    it("spins the settings icon for everyone else", async () => {
+        await page.viewport(375, 700);
+        await commands.setMotionPreference("no-preference");
+        render(<App />);
+
+        const icon = screen.getByRole("button", {
+            name: "Settings",
+        }).firstElementChild!;
+
+        expect(getComputedStyle(icon).animationName).not.toBe("none");
+    });
+
+    it("rings the color swatch when the keyboard reaches it, as every other control", async () => {
+        await page.viewport(1280, 950);
+        render(<App />);
+        const color = screen.getByLabelText("Color");
+
+        while (document.activeElement !== color) await userEvent.tab();
+
+        expect(getComputedStyle(color.closest("label")!).outlineStyle).not.toBe(
+            "none"
+        );
+    });
 });

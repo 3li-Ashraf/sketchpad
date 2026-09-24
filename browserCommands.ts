@@ -1,7 +1,8 @@
 /**
  * @file Commands the browser tests run in Node, beside Playwright, for what a
  * test inside the page cannot do itself: catch the file a download writes to
- * disk, and touch the screen. `src/test/browserCommands.d.ts` types them for
+ * disk, touch the screen, and set the user's motion preference.
+ * `src/test/browserCommands.d.ts` types them for
  * the tests.
  */
 
@@ -92,4 +93,22 @@ const touchDrag: BrowserCommand<
     await session.detach();
 };
 
-export const browserCommands = { recordDownloads, takeDownload, touchDrag };
+/**
+ * Sets the motion preference the page sees, as the operating system's setting
+ * would; "default" goes back to the browser's own. A string, since the first
+ * argument of a command must not be null.
+ */
+const setMotionPreference: BrowserCommand<
+    [preference: "reduce" | "no-preference" | "default"]
+> = async ({ page }, preference) => {
+    await page.emulateMedia({
+        reducedMotion: preference === "default" ? null : preference,
+    });
+};
+
+export const browserCommands = {
+    recordDownloads,
+    takeDownload,
+    touchDrag,
+    setMotionPreference,
+};

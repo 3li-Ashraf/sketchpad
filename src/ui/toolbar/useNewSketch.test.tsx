@@ -121,7 +121,7 @@ describe("New sketch", () => {
             expectNoDialog();
             expect(canvasColors()).toEqual(createBlankGrid(8));
             expect(button("Undo")).toBeDisabled();
-            expect(store().tool).toBe("eraser");
+            expect(store().settings.tool).toBe("eraser");
         });
 
         it("erases a cleared drawing that Undo could still bring back", async () => {

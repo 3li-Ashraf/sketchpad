@@ -29,7 +29,7 @@ interface ToolButtonProps {
  * the two buttons whose state changed rather than the whole panel.
  */
 export const ToolButton: React.FC<ToolButtonProps> = ({ tool }) => {
-    const isActive = useSketchStore((state) => state.tool === tool);
+    const isActive = useSketchStore((state) => state.settings.tool === tool);
     const { setTool } = useSketchActions();
     const { label, Icon } = TOOLS[tool];
 

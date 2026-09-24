@@ -94,7 +94,7 @@ describe("autosave storage", () => {
 
     it("keeps only the latest workspace", async () => {
         const later = workspace();
-        later.settings.tool = "fill";
+        later.settings = { ...later.settings, tool: "fill" };
 
         await writeAutosave(workspace());
         await writeAutosave(later);

@@ -241,6 +241,9 @@ describe("useAutosave", () => {
         render(<Autosaving />);
         actions().undo();
         actions().setGridSize(store().document.gridSize);
+        // Settings chosen again as they already are.
+        actions().setTool(store().settings.tool);
+        actions().setPenColor(store().settings.penColor);
         // A change the workspace leaves out on purpose.
         actions().stopAskingBeforeResize();
 
@@ -1038,7 +1041,7 @@ describe("useAutosave when another tab starts a new sketch", () => {
             colors: createBlankGrid(8),
             undoStack: [],
         });
-        expect(store().tool).toBe("eraser");
+        expect(store().settings.tool).toBe("eraser");
         expect(writes()).toBe(1);
     });
 

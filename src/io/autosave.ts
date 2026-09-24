@@ -30,7 +30,7 @@ import {
     MAX_HISTORY_ENTRIES,
 } from "../domain/history";
 import { isDrawingTool } from "../domain/tools";
-import type { Workspace } from "../domain/workspace";
+import type { EditorSettings, Workspace } from "../domain/workspace";
 import { createLogger } from "../log/logger";
 
 const log = createLogger("autosave");
@@ -61,7 +61,7 @@ export interface AutosaveRecord {
         undoStack: StoredStep[];
         redoStack: StoredStep[];
     };
-    settings: Workspace["settings"];
+    settings: EditorSettings;
 }
 
 // Keyed by the step itself, which is never edited, so a save converts only

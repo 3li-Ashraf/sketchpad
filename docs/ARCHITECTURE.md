@@ -82,11 +82,16 @@ input, so callers detect a no-op by identity.
 
 ## State
 
-`state/sketchStore.ts` holds `document` beside the editor settings: tool, pen
-color, symmetry, grid lines, and the three "ask before" flags. Each action
-applies a domain edit through one helper. When the edit returns the same
-document, the helper hands Zustand back the same state object, and Zustand then
-notifies no subscriber at all.
+`state/sketchStore.ts` holds `document`, `settings` and the three "ask
+before" flags. `settings` is the workspace's own `EditorSettings`
+(`domain/workspace.ts`): tool, pen color, symmetry and grid lines, as one
+object that every change replaces. So restoring puts it back whole, and
+autosave sees any change to it by identity alone.
+
+Each action applies a domain edit, or a change of settings, through one of two
+helpers. When nothing changes (the edit returns the same document, or a
+setting is chosen as it already is), the helper hands Zustand back the same
+state object, and Zustand then notifies no subscriber at all.
 
 Actions live on one `actions` object that is created once, so
 `useSketchActions()` never causes a re-render. Derived values come in two
@@ -296,10 +301,13 @@ can turn those questions back on, so keeping them would make them permanent.
   recorded, so each is converted once and remembered, by identity, and the
   steps restored are remembered as the arrays they were read from.
 - **When** (`autosaveSession` in `ui/autosave/`, which `useAutosave` starts
-  and stops): 500 ms after edits settle, so a burst writes once; at once when
-  the page is hidden or unloaded, because a phone can end a background tab
-  without warning. A save that falls due during a stroke waits for the stroke
-  to end rather than stall the drag.
+  and stops): 500 ms after edits settle, so a burst writes once, and at once
+  when the page is hidden or unloaded, because a phone can end a background
+  tab without warning. A save that falls due during a stroke waits for the
+  stroke to end rather than stall the drag. Whether an edit changed what is
+  kept is checked on every change to the store, pointer moves included, so the
+  check builds nothing: the settings compare by identity, and the document by
+  `isSameCommittedDocument`, part by part.
 - **What:** the drawing as last committed (`committedDocument`). A stroke
   still being drawn is not an undo step yet, so saving its cells would keep
   paint that undo could never take away; leaving the page mid-stroke keeps

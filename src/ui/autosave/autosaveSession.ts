@@ -13,6 +13,7 @@
  */
 
 import { isStrokeOpen } from "../../domain/sketchDocument";
+import { isSameCommittedDocument } from "../../domain/sketchDocument";
 import type { Workspace } from "../../domain/workspace";
 import { clearAutosave, readAutosave, writeAutosave } from "../../io/autosave";
 import {
@@ -34,21 +35,14 @@ const log = createLogger("autosave");
 export const AUTOSAVE_DELAY = 500;
 
 /**
- * Every part of the workspace, to compare by identity, since an edit replaces
- * what it changes. Read through `workspaceOf`, so a part added there is
- * watched too, and a stroke's paint is no change until the stroke commits.
+ * Whether what the workspace keeps has changed, compared by identity, since
+ * every change replaces what it changes. It runs on every change to the
+ * store, pointer moves included, so it builds nothing to compare; and a
+ * stroke's paint is no change until the stroke commits.
  */
-const partsOf = (state: SketchStore): unknown[] => {
-    const { document, settings } = workspaceOf(state);
-
-    return [...Object.values(document), ...Object.values(settings)];
-};
-
-const workspaceChanged = (next: SketchStore, previous: SketchStore) => {
-    const before = partsOf(previous);
-
-    return partsOf(next).some((part, at) => part !== before[at]);
-};
+const workspaceChanged = (next: SketchStore, previous: SketchStore) =>
+    next.settings !== previous.settings ||
+    !isSameCommittedDocument(next.document, previous.document);
 
 /** The choice between the drawing on the device and the canvas as it is. */
 export interface Question {

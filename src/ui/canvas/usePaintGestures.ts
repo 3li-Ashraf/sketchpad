@@ -95,10 +95,10 @@ export const usePaintGestures = (): PaintGestures => {
 
             event.preventDefault();
 
-            const { document, tool } = useSketchStore.getState();
+            const { document, settings } = useSketchStore.getState();
             const index = toCellIndex(position, document.gridSize);
 
-            if (!isStrokeTool(tool)) {
+            if (!isStrokeTool(settings.tool)) {
                 fillFrom(index);
                 return;
             }

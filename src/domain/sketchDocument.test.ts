@@ -20,6 +20,7 @@ import {
     endStroke,
     fillFrom,
     hasWorkToLose,
+    isSameCommittedDocument,
     isStrokeOpen,
     openDocument,
     paintCells,
@@ -561,6 +562,42 @@ describe("the committed document", () => {
 
         expect(isStrokeOpen(doc)).toBe(false);
         expect(undo(doc).colors).toEqual(createBlankGrid(4));
+    });
+});
+
+describe("isSameCommittedDocument", () => {
+    it("tells documents apart by what they have committed, not by a stroke's paint", () => {
+        const doc = stroke(createDocument(4), [0]);
+        const painting = paintCells(beginStroke(doc), [1], brush());
+
+        expect(isSameCommittedDocument(doc, doc)).toBe(true);
+        expect(isSameCommittedDocument(doc, painting)).toBe(true);
+        expect(isSameCommittedDocument(doc, endStroke(painting))).toBe(false);
+        expect(isSameCommittedDocument(doc, undo(doc))).toBe(false);
+        expect(isSameCommittedDocument(undo(doc), redo(undo(doc)))).toBe(false);
+        expect(isSameCommittedDocument(doc, resizeDocument(doc, 8))).toBe(
+            false
+        );
+    });
+
+    it("compares each part the committed document holds", () => {
+        const doc = stroke(createDocument(4), [0]);
+        const committed = committedDocument(doc);
+
+        // A part added to the committed document without being compared here
+        // would fail this, so the two stay in step.
+        expect(Object.keys(committed).sort()).toEqual([
+            "colors",
+            "gridSize",
+            "redoStack",
+            "undoStack",
+        ]);
+        expect(isSameCommittedDocument(doc, { ...doc, gridSize: 5 })).toBe(
+            false
+        );
+        expect(isSameCommittedDocument(doc, { ...doc, redoStack: [] })).toBe(
+            false
+        );
     });
 });
 

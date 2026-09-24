@@ -43,9 +43,13 @@ interface ToolbarProps {
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ ref, id, isOpen }) => {
-    const penColor = useSketchStore((state) => state.penColor);
-    const symmetry = useSketchStore((state) => state.symmetry);
-    const showGridLines = useSketchStore((state) => state.showGridLines);
+    // Each on its own, so switching tools, which only the tool buttons
+    // show, does not re-render the panel.
+    const penColor = useSketchStore((state) => state.settings.penColor);
+    const symmetry = useSketchStore((state) => state.settings.symmetry);
+    const showGridLines = useSketchStore(
+        (state) => state.settings.showGridLines
+    );
     const canUndo = useSketchStore(selectCanUndo);
     const canRedo = useSketchStore(selectCanRedo);
 

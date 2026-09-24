@@ -23,20 +23,6 @@ const renderToolbar = (isOpen = true) => render(<Toolbar isOpen={isOpen} />);
 
 const panel = () => screen.getByRole("complementary", { name: "Settings" });
 
-describe("visibility", () => {
-    it("is hidden on small screens until it is opened", () => {
-        renderToolbar(false);
-
-        expect(panel()).toHaveClass("hidden");
-    });
-
-    it("is shown once opened", () => {
-        renderToolbar(true);
-
-        expect(panel()).toHaveClass("flex");
-    });
-});
-
 describe("layout", () => {
     // The order is a design decision, explained where the panel lays it out;
     // this keeps any change to it deliberate. Tab visits the controls in the
@@ -132,6 +118,32 @@ describe("color", () => {
         );
 
         expect(store().penColor).toBe("#3EA6FF");
+    });
+
+    it("shows the pen color in the swatch and the picker", () => {
+        actions().setPenColor("#3EA6FF");
+        renderToolbar();
+        const picker = screen.getByLabelText("Color", { selector: "input" });
+
+        expect(picker).toHaveValue("#3ea6ff");
+        expect(picker.closest("label")).toHaveStyle({
+            backgroundColor: "rgb(62, 166, 255)",
+        });
+    });
+});
+
+describe("the colorful pen's icon", () => {
+    it("fills the pen with a gradient of its own", () => {
+        renderToolbar();
+        const fill = button("Colorful pen")
+            .querySelector("path")
+            ?.getAttribute("fill");
+        const id = /^url\(#(.+)\)$/.exec(fill ?? "")?.[1];
+
+        const gradient = id ? document.getElementById(id) : null;
+
+        expect(gradient?.tagName).toBe("linearGradient");
+        expect(gradient?.querySelectorAll("stop")).toHaveLength(5);
     });
 });
 

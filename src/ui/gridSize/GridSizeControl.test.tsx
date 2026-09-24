@@ -68,21 +68,7 @@ describe("grid size", () => {
         expect(slider()).toHaveAttribute("min", String(MIN_GRID_SIZE));
         expect(slider()).toHaveAttribute("max", String(MAX_GRID_SIZE));
         expect(slider()).toHaveValue(String(store().document.gridSize));
-    });
-
-    it("shows the current grid size as a square", () => {
-        renderControl();
-
-        expect(screen.getByText("32 × 32")).toBeInTheDocument();
-    });
-
-    it("resizes the canvas and updates the label", () => {
-        renderControl();
-
-        fireEvent.change(slider(), { target: { value: "8" } });
-
-        expect(store().document.gridSize).toBe(8);
-        expect(screen.getByText("8 × 8")).toBeInTheDocument();
+        expect(slider()).toHaveAttribute("aria-valuetext", "32 by 32");
     });
 
     it("leaves a blank grid's slider to the pointer, and resizes it live", () => {

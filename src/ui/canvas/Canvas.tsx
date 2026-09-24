@@ -1,6 +1,6 @@
 /**
- * @file The drawing surface: a CSS grid of `CanvasCell`s, driven by
- * `usePaintGestures`.
+ * @file The drawing surface: a CSS grid of `CanvasCell`s in `CanvasRow`s,
+ * driven by `usePaintGestures`.
  */
 
 import { useMemo } from "react";
@@ -11,8 +11,8 @@ import {
     CANVAS_FRAME_PADDING,
     CANVAS_FRAME_WIDTH,
     EDITOR_PANEL_HEIGHT,
-} from "../common/panelSize";
-import { CanvasCell } from "./CanvasCell";
+} from "../common/layout";
+import { CanvasRow } from "./CanvasRow";
 import { usePaintGestures } from "./usePaintGestures";
 
 export const Canvas: React.FC = () => {
@@ -20,12 +20,12 @@ export const Canvas: React.FC = () => {
     const showGridLines = useSketchStore((state) => state.showGridLines);
     const { surfaceRef, surfaceProps } = usePaintGestures();
 
-    // The cells depend on the grid size alone, so a stroke never rebuilds
+    // The rows depend on the grid size alone, so a stroke never rebuilds
     // them. `Canvas.test` pins this: widening the dependencies fails it.
-    const cells = useMemo(
+    const rows = useMemo(
         () =>
-            Array.from({ length: gridSize * gridSize }, (_, index) => (
-                <CanvasCell key={index} index={index} />
+            Array.from({ length: gridSize }, (_, row) => (
+                <CanvasRow key={row} row={row} gridSize={gridSize} />
             )),
         [gridSize]
     );
@@ -50,7 +50,7 @@ export const Canvas: React.FC = () => {
                 }}
                 {...surfaceProps}
             >
-                {cells}
+                {rows}
             </div>
         </div>
     );

@@ -52,51 +52,51 @@ describe("traceLine", () => {
         ]);
     });
 
-    it("visits both endpoints and never jumps, whatever the slope", () => {
-        const endpoints: [CellPosition, CellPosition][] = [
-            [
-                { row: 0, column: 0 },
-                { row: 2, column: 7 },
-            ],
-            [
-                { row: 5, column: 1 },
-                { row: 0, column: 9 },
-            ],
-            [
-                { row: 9, column: 9 },
-                { row: 0, column: 4 },
-            ],
-            [
-                { row: 3, column: 8 },
-                { row: 8, column: 0 },
-            ],
-        ];
+    // Every pair of cells in a 12×12 grid, which is every slope and
+    // direction a drag between two samples can have at that size.
+    it("draws the nearest cells to the true line, one per step along it", () => {
+        const size = 12;
+        const failures: string[] = [];
 
-        for (const [from, to] of endpoints) {
-            const visited = trace(from, to);
+        for (let a = 0; a < size * size; a++) {
+            for (let b = 0; b < size * size; b++) {
+                const from = { row: Math.floor(a / size), column: a % size };
+                const to = { row: Math.floor(b / size), column: b % size };
+                const visited = trace(from, to);
+                const rows = to.row - from.row;
+                const columns = to.column - from.column;
+                const steps = Math.max(Math.abs(rows), Math.abs(columns));
 
-            expect(visited.at(0)).toEqual(from);
-            expect(visited.at(-1)).toEqual(to);
+                // One cell per step along the longer axis, so no cell is
+                // visited twice and none is skipped.
+                if (visited.length !== steps + 1) {
+                    failures.push(`${a}→${b}: ${visited.length} cells`);
+                }
+                if (
+                    visited[0].row !== from.row ||
+                    visited[0].column !== from.column ||
+                    visited.at(-1)?.row !== to.row ||
+                    visited.at(-1)?.column !== to.column
+                ) {
+                    failures.push(`${a}→${b}: wrong endpoints`);
+                }
 
-            for (let step = 1; step < visited.length; step++) {
-                const rowStep = Math.abs(
-                    visited[step].row - visited[step - 1].row
-                );
-                const columnStep = Math.abs(
-                    visited[step].column - visited[step - 1].column
-                );
+                // Each cell is the one nearest the true line on the shorter
+                // axis, half a cell away at most, where a tie falls.
+                visited.forEach(({ row, column }, step) => {
+                    const along = steps === 0 ? 0 : step / steps;
+                    const offRow = Math.abs(row - (from.row + rows * along));
+                    const offColumn = Math.abs(
+                        column - (from.column + columns * along)
+                    );
 
-                expect(Math.max(rowStep, columnStep)).toBe(1);
+                    if (Math.max(offRow, offColumn) > 0.5) {
+                        failures.push(`${a}→${b}: step ${step} off the line`);
+                    }
+                });
             }
         }
-    });
 
-    it("never revisits a cell", () => {
-        const visited = trace({ row: 5, column: 1 }, { row: 0, column: 9 });
-        const unique = new Set(
-            visited.map(({ row, column }) => `${row},${column}`)
-        );
-
-        expect(unique.size).toBe(visited.length);
+        expect(failures).toEqual([]);
     });
 });

@@ -25,9 +25,9 @@ import {
     selectCanRedo,
     selectCanUndo,
     selectHasWorkToLose,
-    selectSketch,
-    selectWorkspace,
+    sketchOf,
     useSketchStore,
+    workspaceOf,
 } from "./sketchStore";
 
 const PEN = "#123456";
@@ -183,7 +183,7 @@ describe("edits", () => {
 
         actions().loadSketch({ gridSize: 2, colors });
 
-        expect(selectSketch(store())).toEqual({ gridSize: 2, colors });
+        expect(sketchOf(store())).toEqual({ gridSize: 2, colors });
         expect(selectCanUndo(store())).toBe(false);
     });
 
@@ -248,7 +248,7 @@ describe("restoring a workspace", () => {
         paintStroke(0);
         actions().setTool("eraser");
         actions().toggleGridLines();
-        const workspace = selectWorkspace(store());
+        const workspace = workspaceOf(store());
         resetSketchStore();
 
         return workspace;
@@ -259,7 +259,7 @@ describe("restoring a workspace", () => {
 
         actions().restoreWorkspace(workspace);
 
-        expect(selectWorkspace(store())).toEqual(workspace);
+        expect(workspaceOf(store())).toEqual(workspace);
         expect(selectCanUndo(store())).toBe(true);
     });
 
@@ -285,7 +285,7 @@ describe("restoring a workspace", () => {
     });
 });
 
-describe("selectors", () => {
+describe("selectors and derived values", () => {
     it("report work to lose once there is any", () => {
         expect(selectHasWorkToLose(store())).toBe(false);
 
@@ -294,25 +294,25 @@ describe("selectors", () => {
         expect(selectHasWorkToLose(store())).toBe(true);
     });
 
-    it("select the artwork without the editor state around it", () => {
+    it("give the artwork without the editor state around it", () => {
         paintStroke(0);
 
-        expect(selectSketch(store())).toEqual({
+        expect(sketchOf(store())).toEqual({
             gridSize: DEFAULT_GRID_SIZE,
             colors: canvasColors(),
         });
     });
 
-    it("select the workspace as last committed, without a stroke in progress", () => {
+    it("give the workspace as last committed, without a stroke in progress", () => {
         actions().setTool("colorfulPen");
         actions().toggleSymmetry("topBottom");
         paintStroke(0);
-        const committed = selectWorkspace(store());
+        const committed = workspaceOf(store());
 
         actions().beginStroke();
         actions().paintCells([1]);
 
-        expect(selectWorkspace(store())).toEqual(committed);
+        expect(workspaceOf(store())).toEqual(committed);
         expect(committed.document.colors).toBe(store().document.strokeBaseline);
         expect(committed.settings).toEqual({
             tool: "colorfulPen",

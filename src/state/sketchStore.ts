@@ -157,6 +157,9 @@ export const useSketchStore = create<SketchStore>()((set) => {
 export const useSketchActions = (): SketchActions =>
     useSketchStore((state) => state.actions);
 
+// Selectors, safe to pass to `useSketchStore`: each returns a primitive or a
+// part of the state, so an unchanged state selects an equal value.
+
 export const selectCanUndo = (state: SketchStore): boolean =>
     state.document.undoStack.length > 0;
 
@@ -166,11 +169,15 @@ export const selectCanRedo = (state: SketchStore): boolean =>
 export const selectHasWorkToLose = (state: SketchStore): boolean =>
     hasWorkToLose(state.document);
 
+// Derived values, built afresh on every call, so read them from
+// `useSketchStore.getState()`. As a selector, a new object each time would
+// never compare equal, and the component would render without end.
+
 /**
  * Everything kept between visits, as last committed: a stroke still being
  * drawn is left out. See `domain/workspace`.
  */
-export const selectWorkspace = ({
+export const workspaceOf = ({
     document,
     tool,
     penColor,
@@ -182,7 +189,7 @@ export const selectWorkspace = ({
 });
 
 /** The artwork alone, without history or editor settings. */
-export const selectSketch = ({ document }: SketchStore): Sketch => ({
+export const sketchOf = ({ document }: SketchStore): Sketch => ({
     gridSize: document.gridSize,
     colors: document.colors,
 });

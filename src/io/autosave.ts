@@ -1,7 +1,8 @@
 /**
  * @file The autosave: the workspace kept in the browser's IndexedDB between
  * visits, on this device only, and the only definition of the record it is
- * kept as.
+ * kept as. Every tab shares the one record; `autosaveChannel` is how they tell
+ * each other they have written it.
  *
  * IndexedDB rather than `localStorage`: a full undo history can outgrow the
  * few megabytes `localStorage` allows, and IndexedDB stores structured values
@@ -230,7 +231,6 @@ export const decodeAutosave = (value: unknown): Workspace | null => {
         !redoStack ||
         !symmetry ||
         !isDrawingTool(tool) ||
-        typeof penColor !== "string" ||
         !isHexColor(penColor) ||
         typeof showGridLines !== "boolean"
     ) {
@@ -300,25 +300,41 @@ export const readAutosave = async (): Promise<Workspace | null> => {
     return workspace;
 };
 
-/** Replaces the saved workspace; resolves once it is committed to disk. */
-export const writeAutosave = (workspace: Workspace): Promise<void> => {
-    const record = encodeAutosave(workspace);
-
-    return withDatabase(
+/**
+ * Makes one change to the store, and resolves once it is committed to disk,
+ * or rejects, saying what did not happen.
+ */
+const commit = (
+    change: (store: IDBObjectStore) => void,
+    failure: string
+): Promise<void> =>
+    withDatabase(
         (database) =>
             new Promise<void>((resolve, reject) => {
                 const transaction = database.transaction(
                     STORE_NAME,
                     "readwrite"
                 );
-                transaction.objectStore(STORE_NAME).put(record, KEY);
+                change(transaction.objectStore(STORE_NAME));
                 transaction.oncomplete = () => resolve();
                 transaction.onerror = transaction.onabort = () =>
-                    reject(
-                        new Error("Autosave was not written", {
-                            cause: transaction.error,
-                        })
-                    );
+                    reject(new Error(failure, { cause: transaction.error }));
             })
     );
+
+/** Replaces the saved workspace; resolves once it is committed to disk. */
+export const writeAutosave = (workspace: Workspace): Promise<void> => {
+    const record = encodeAutosave(workspace);
+
+    return commit(
+        (store) => store.put(record, KEY),
+        "Autosave was not written"
+    );
 };
+
+/**
+ * Empties the store, so the device keeps nothing of the workspace, and
+ * resolves once that is committed to disk.
+ */
+export const clearAutosave = (): Promise<void> =>
+    commit((store) => store.clear(), "Autosave was not cleared");

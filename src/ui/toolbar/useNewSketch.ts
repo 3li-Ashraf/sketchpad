@@ -10,6 +10,7 @@ import {
     useSketchActions,
     useSketchStore,
 } from "../../state/sketchStore";
+import { clearSavedWorkspace } from "../autosave/autosaveSession";
 import type { ConfirmDialogProps } from "../common/Dialog";
 
 export const NEW_SKETCH_DIALOG_TITLE = "Start a new sketch?";
@@ -26,11 +27,18 @@ interface NewSketch {
 
 /**
  * Clear canvas is one undo step, so it asks nothing. This erases the history
- * too, and once autosaved the drawing is gone from the device.
+ * too, and clears the autosave from the device at once, so the drawing is
+ * gone from there as well.
  */
 export const useNewSketch = (): NewSketch => {
     const { startNewSketch, stopAskingBeforeNewSketch } = useSketchActions();
     const [isAsking, setIsAsking] = useState(false);
+
+    // The store first: clearing then drops the save its change scheduled.
+    const startOver = useCallback(() => {
+        startNewSketch();
+        clearSavedWorkspace();
+    }, [startNewSketch]);
 
     const requestNewSketch = useCallback(() => {
         const state = useSketchStore.getState();
@@ -38,9 +46,9 @@ export const useNewSketch = (): NewSketch => {
         if (state.askBeforeNewSketch && selectHasWorkToLose(state)) {
             setIsAsking(true);
         } else {
-            startNewSketch();
+            startOver();
         }
-    }, [startNewSketch]);
+    }, [startOver]);
 
     const newSketchDialog: ConfirmDialogProps | null = isAsking
         ? {
@@ -49,7 +57,7 @@ export const useNewSketch = (): NewSketch => {
               confirmLabel: "Start new sketch",
               onConfirm: (dontAskAgain) => {
                   if (dontAskAgain) stopAskingBeforeNewSketch();
-                  startNewSketch();
+                  startOver();
                   setIsAsking(false);
               },
               onCancel: () => setIsAsking(false),

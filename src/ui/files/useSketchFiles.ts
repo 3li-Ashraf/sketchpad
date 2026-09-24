@@ -20,7 +20,7 @@ import {
 import { createLogger } from "../../log/logger";
 import {
     selectHasWorkToLose,
-    selectSketch,
+    sketchOf,
     useSketchActions,
     useSketchStore,
 } from "../../state/sketchStore";
@@ -66,7 +66,7 @@ interface SketchFiles {
     replaceDialog: ConfirmDialogProps | null;
 }
 
-const currentSketch = (): Sketch => selectSketch(useSketchStore.getState());
+const currentSketch = (): Sketch => sketchOf(useSketchStore.getState());
 
 const carriesFiles = (event: DragEvent): boolean =>
     event.dataTransfer?.types.includes("Files") ?? false;
@@ -106,7 +106,7 @@ export const useSketchFiles = (): SketchFiles => {
             });
     }, []);
 
-    const openSketch = useCallback(() => fileInputRef.current?.click(), []);
+    const openSketch = useCallback(() => fileInputRef.current!.click(), []);
 
     // Never rejects: `readSketchFile` returns every failure as a reason.
     const loadFile = useCallback(

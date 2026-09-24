@@ -32,7 +32,7 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
             aria-pressed={isActive}
             disabled={isDisabled}
             onClick={onClick}
-            className="toolbar-control text-xl"
+            className="control text-xl"
         >
             {children}
         </button>

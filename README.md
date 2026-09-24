@@ -13,19 +13,21 @@ Tailwind CSS. It runs at <https://3li-ashraf.github.io/sketchpad>.
 - **Rotate**: turn the whole drawing a quarter turn clockwise; Undo turns it
   back.
 - **New sketch**: start over on a blank canvas of the same size. Clear
-  canvas can be undone; New sketch also erases the undo history, including the
-  copy autosaved on the device.
+  canvas can be undone; New sketch also erases the undo history, and clears
+  the copy autosaved on the device at once. Other open tabs start over too.
 - **History**: undo and redo a whole stroke at a time, up to 100 steps.
   <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes; <kbd>Ctrl</kbd>+<kbd>Y</kbd> or
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes (<kbd>Cmd</kbd> on
-  macOS).
+  macOS), on any keyboard layout.
 - **Files**: save a sketch to a compact `.skpd` file and open it again, or
   export it as a PNG at 50 pixels per cell. A file that cannot be opened is
   reported with the reason.
 - **Drag and drop**: drop a `.skpd` file anywhere on the page to open it.
 - **Autosave**: the drawing, its whole undo history and the settings are kept
   in the browser on this device, and come back after a reload, a closed tab
-  or a crash.
+  or a crash. Open tabs keep in step, so one left behind never writes an
+  older drawing over newer work, and a saved drawing that is slow to load is
+  never erased unasked.
 - **No lost work**: resizing the grid, opening a file or starting a new
   sketch asks first whenever it would erase a drawing. "Don't ask again" lasts until the page is reloaded.
 
@@ -45,6 +47,10 @@ built for a GitHub Pages project site, so it is not served from the root.
 The browser tests run in all three engines. On a machine where one cannot
 run, name the others in `TEST_BROWSERS`, for example in an untracked
 `.env.local`: `TEST_BROWSERS=chromium,webkit`.
+
+The property tests start from a fixed seed, so every run checks the same
+cases. `TEST_SEED=<number> npm test` checks others, or replays the seed a
+failure printed.
 
 | Script                  | What it does                                                     |
 | ----------------------- | ---------------------------------------------------------------- |
@@ -70,9 +76,10 @@ wrong way:
 src/
   log/      the logger: warnings and errors, to the browser console
   domain/   the rules of a sketch: grid, colors, tools, history, editing
-  io/       browser I/O: the .skpd format, compression, PNG export, downloads
+  io/       browser I/O: the .skpd format, compression, PNG export, downloads,
+            the autosave record and the channel between tabs
   state/    the Zustand store, which applies domain edits
-  ui/       canvas/, toolbar/, gridSize/, files/ and common/ components
+  ui/       canvas/, toolbar/, gridSize/, files/, autosave/ and common/
   app/      the shell that lays them out, and catches crashes
 ```
 

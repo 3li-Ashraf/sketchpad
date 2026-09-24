@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { fc } from "../test/property";
 import {
     appendEntry,
     diffColors,
@@ -86,13 +87,44 @@ describe("revertEntry and reapplyEntry", () => {
 });
 
 describe("a diff and its inverse", () => {
+    const color = fc.constantFrom("#FFFFFF", "#000000", "#123456");
+
+    /** Two snapshots of one grid, frozen so an edit to either would throw. */
+    const snapshots = fc
+        .nat(40)
+        .chain((length) =>
+            fc.tuple(
+                fc.array(color, { minLength: length, maxLength: length }),
+                fc.array(color, { minLength: length, maxLength: length })
+            )
+        )
+        .map(([before, after]) => [
+            Object.freeze(before),
+            Object.freeze(after),
+        ]);
+
+    it("record exactly the cells that differ, in order, with both colors", () => {
+        fc.assert(
+            fc.property(snapshots, ([before, after]) => {
+                const expected = before.flatMap((color, index) =>
+                    color === after[index]
+                        ? []
+                        : [{ index, before: color, after: after[index] }]
+                );
+
+                expect(diffColors(before, after)).toEqual(expected);
+            })
+        );
+    });
+
     it("reapply to the new grid and revert to the old", () => {
-        const before = ["#000000", "#111111", "#222222", "#333333"];
-        const after = ["#000000", "#AAAAAA", "#222222", "#BBBBBB"];
+        fc.assert(
+            fc.property(snapshots, ([before, after]) => {
+                const entry = diffColors(before, after);
 
-        const entry = diffColors(before, after);
-
-        expect(reapplyEntry(before, entry)).toEqual(after);
-        expect(revertEntry(after, entry)).toEqual(before);
+                expect(reapplyEntry(before, entry)).toEqual(after);
+                expect(revertEntry(after, entry)).toEqual(before);
+            })
+        );
     });
 });

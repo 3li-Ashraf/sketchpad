@@ -5,7 +5,7 @@
 
 import { Component } from "react";
 
-import { TEXT_BUTTON } from "../ui/common/Dialog";
+import { TextButton } from "../ui/common/TextButton";
 
 interface ErrorBoundaryProps {
     children: React.ReactNode;
@@ -42,13 +42,11 @@ export class ErrorBoundary extends Component<
                     Sketchpad hit an error it could not recover from on its own.
                     Your drawing is still here; try again to get back to it.
                 </p>
-                <button
-                    type="button"
+                <TextButton
                     onClick={() => this.setState({ hasCrashed: false })}
-                    className={TEXT_BUTTON}
                 >
                     Try again
-                </button>
+                </TextButton>
             </div>
         );
     }

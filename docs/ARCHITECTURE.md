@@ -9,14 +9,15 @@ a line needs one; this document holds the reasoning that spans files.
 src/
   log/       the logger, which every layer may use
   domain/    pure rules: grid, color, line, tools, history, sketchDocument, workspace
-  io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosave
+  io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosave, autosaveChannel
   state/     sketchStore, the one Zustand store
   ui/
-    canvas/    Canvas, CanvasCell, usePaintGestures
-    toolbar/   Toolbar, ToolbarButton, ColorPicker, ColorfulPenIcon, useNewSketch
+    canvas/    Canvas, CanvasRow, CanvasCell, useCellColor, usePaintGestures
+    toolbar/   Toolbar, ToolbarButton, ToolButton, ColorPicker, ColorfulPenIcon, RotateRightIcon, useNewSketch
     gridSize/  GridSizeControl, GridSizeSlider, useGridResize
-    files/     useSketchFiles, fileMessages, autosave
-    common/    Dialog, isDialogOpen, Tooltip, panelSize
+    files/     useSketchFiles, fileMessages
+    autosave/  restoreAutosave, autosaveSession, useAutosave
+    common/    Dialog, TextButton, isDialogOpen, Tooltip, layout
   app/       App, Header, Footer, ErrorBoundary, errorReporting, and hooks
   styles/    index.css, the Tailwind entry point and design tokens
   test/      helpers, stubs and fixtures shared by the tests
@@ -88,23 +89,29 @@ document, the helper hands Zustand back the same state object, and Zustand then
 notifies no subscriber at all.
 
 Actions live on one `actions` object that is created once, so
-`useSketchActions()` never causes a re-render. Derived values are selectors:
-`selectCanUndo`, `selectCanRedo`, `selectHasWorkToLose`, `selectSketch`, and
-`selectWorkspace`, which `restoreWorkspace` puts back (see [Autosave](#autosave)).
+`useSketchActions()` never causes a re-render. Derived values come in two
+kinds, and the name says which:
+
+- **Selectors** (`select…`), safe to pass to `useSketchStore`, return a
+  primitive: `selectCanUndo`, `selectCanRedo` and `selectHasWorkToLose`.
+- **Values built on each call** (`…Of`) are read from `getState()`: `sketchOf`,
+  and `workspaceOf`, which `restoreWorkspace` puts back (see
+  [Autosave](#autosave)). As a selector, a new object every time would never
+  compare equal, and the component would render without end.
 
 ## Validation
 
 Each kind of value has one rule, defined once in `domain/`, and every boundary
 where that kind of value arrives checks it:
 
-| Rule                                                      | Checked where                                                                                      |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `parseHexColor` / `isHexColor`: `#` and six hex digits    | `setPenColor` (from the color input), and the brush and fill colors in `paintCells` and `fillFrom` |
-| `isCellIndex`: a whole number inside the grid             | `paintCells`, `fillFrom` and `collectFillRegion`                                                   |
-| A finite grid size, clamped to 1..64                      | `resizeDocument` (from the slider)                                                                 |
-| `isValidSketch`: supported size, one valid color per cell | `openDocument` (loading), `encodeSketch` (saving) and `renderSketchPng` (exporting)                |
-| `decodeAutosave`: every part of an autosaved workspace    | `readAutosave`, when the page opens                                                                |
-| The `.skpd` format's own checks                           | `decodeSketch` and `readSketchFile`; see [the format](#the-skpd-format)                            |
+| Rule                                                               | Checked where                                                                                      |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `parseHexColor` / `isHexColor`: a string of `#` and six hex digits | `setPenColor` (from the color input), and the brush and fill colors in `paintCells` and `fillFrom` |
+| `isCellIndex`: a whole number inside the grid                      | `paintCells`, `fillFrom` and `collectFillRegion`                                                   |
+| A finite grid size, clamped to 1..64                               | `resizeDocument` (from the slider)                                                                 |
+| `isValidSketch`: supported size, one valid color per cell          | `openDocument` (loading), `encodeSketch` (saving) and `renderSketchPng` (exporting)                |
+| `decodeAutosave`: every part of an autosaved workspace             | `readAutosave`, when the page opens                                                                |
+| The `.skpd` format's own checks                                    | `decodeSketch` and `readSketchFile`; see [the format](#the-skpd-format)                            |
 
 **Who hears about it depends on who can cause it.**
 
@@ -129,7 +136,10 @@ from code; read back from storage, they are (`isDrawingTool`).
 
 The native color input reports lowercase, so `parseHexColor` uppercases what it
 accepts, and decoded files are built by `rgbToHex`. Every color the app holds is
-therefore uppercase `#RRGGBB`, and colors compare with `===`.
+therefore uppercase `#RRGGBB`, and colors compare with `===`. `isHexColor`
+checks the type before the pattern, because a pattern test converts its
+argument to a string: a `String` object, which storage keeps as one, would
+otherwise pass as the color it spells and then compare unequal to it.
 
 ## Logging and errors
 
@@ -156,17 +166,17 @@ that throws is skipped, so a broken destination cannot break the app.
 
 What is logged:
 
-| Source       | Level | Message                                      | When                                                      |
-| ------------ | ----- | -------------------------------------------- | --------------------------------------------------------- |
-| `validation` | error | invalid input refused                        | A guard refused a value, which only a bug produces        |
-| `files`      | error | save failed, export failed                   | With the cause; the user sees the failure dialog          |
-| `files`      | warn  | file could not be read                       | The browser's reason; the user sees "File unavailable"    |
-| `app`        | error | render crashed; showing the error screen     | A component threw while rendering                         |
-| `app`        | error | render crashed                               | A render error outside the error screen's reach           |
-| `app`        | warn  | render recovered from an error               | React recovered on its own                                |
-| `app`        | error | uncaught error, unhandled promise rejection  | Anything else nothing handled                             |
-| `autosave`   | warn  | autosave failed                              | Once per run of failed saves, such as a full disk         |
-| `autosave`   | warn  | autosave could not be read, autosave ignored | Opening blank: storage failed, or the record was unusable |
+| Source       | Level | Message                                      | When                                                                  |
+| ------------ | ----- | -------------------------------------------- | --------------------------------------------------------------------- |
+| `validation` | error | invalid input refused                        | A guard refused a value, which only a bug produces                    |
+| `files`      | error | save failed, export failed                   | With the cause; the user sees the failure dialog                      |
+| `files`      | warn  | file could not be read                       | The browser's reason; the user sees "File unavailable"                |
+| `app`        | error | render crashed; showing the error screen     | A component threw while rendering                                     |
+| `app`        | error | render crashed                               | A render error outside the error screen's reach                       |
+| `app`        | warn  | render recovered from an error               | React recovered on its own                                            |
+| `app`        | error | uncaught error, unhandled promise rejection  | Anything else nothing handled                                         |
+| `autosave`   | warn  | autosave failed                              | Once per run of failed saves, clears or reads, such as a full disk    |
+| `autosave`   | warn  | autosave could not be read, autosave ignored | Opening blank: storage failed or was late, or the record was unusable |
 
 A bad file the decoder refuses is not logged: that is the user's file, not a
 fault, and the dialog already explains it.
@@ -183,18 +193,31 @@ so it survives the retry.
 
 ## Rendering and input
 
-The canvas is a CSS grid of one `CanvasCell` per cell. Each cell is memoized
-and subscribes to its own color, and the cell elements are rebuilt only when
-the grid size changes, so a stroke re-renders only the cells it touched. Grid
-lines are an `outline` rule on the container, so toggling them changes one
-class and no cell.
+The canvas is a CSS grid of one memoized `CanvasCell` per cell, built only
+when the grid size changes. Two choices keep a stroke's cost to the cells it
+touched:
 
-Measured on the production build in desktop Chromium at 64×64 (4096 cells):
+- **One subscription for every cell** (`useCellColor`). A store selector per
+  cell ran 4096 of them on every change to the store, colors or not. One
+  listener instead compares the colors when they change and wakes only the
+  cells whose color did. It compares over the length both grids share: a
+  resize keeps the elements of the cells whose index survives, and past that
+  length a cell is either new, reading the store as it mounts, or leaving.
+- **Cells grouped in rows** (`CanvasRow`). From one flat list of 4096, React
+  walked every cell to reach the one that changed. A memoized row per grid
+  row, `display: contents` so its cells stay items of the grid, cuts that to
+  the row and the list of rows.
 
-| Operation                                    | Cost                      |
-| -------------------------------------------- | ------------------------- |
-| One pointer move of a drag, including render | 0.6 ms median, 1.3 ms max |
-| Resizing from 8×8 to 64×64                   | about 25 ms of script     |
+Grid lines are an `outline` rule on the surface, reaching the cells through
+their rows, so toggling them changes one class and no cell.
+
+Measured on the production build in desktop Chromium at 64×64 (4096 cells),
+from dispatch until React has rendered, before and after those two changes:
+
+| Operation                                    | Before                    | After                     |
+| -------------------------------------------- | ------------------------- | ------------------------- |
+| One pointer move of a drag, including render | 0.6 ms median, p99 1.3 ms | 0.1 ms median, p99 0.3 ms |
+| Resizing from 8×8 to 64×64                   | about 54 ms               | about 22 ms               |
 
 Drawing fits many times over in a frame, so a `<canvas>` renderer would not pay
 for what it costs: DOM cells can be queried in tests, and grid lines are one
@@ -212,6 +235,12 @@ Input is Pointer Events, one path for mouse, touch and pen
 - Release and cancel are heard on `window`, so a stroke still commits when the
   pointer comes up off the canvas. Leaving the canvas mid-drag starts a new
   segment on return, rather than drawing a line across the gap.
+- A move that reports no button held ends the stroke instead of painting:
+  the release was never delivered, as when the window loses focus mid-drag,
+  and painting on would draw wherever the pointer hovered.
+- A stroke also commits when the canvas unmounts mid-drag, as when a crash
+  swaps in the error screen. Nothing would hear its release, and an open
+  stroke refuses undo, fill, clear and rotate, and holds back the autosave.
 - `touch-action: none` on the frame keeps the browser from claiming a finger
   drag as a pan or zoom.
 
@@ -226,14 +255,16 @@ one undo away from its drawing.
   ignores the pointer, so a press cannot start a drag that would carry on
   beneath the dialog, and a key that would step it is caught first. Either one
   asks. Unlocking erases nothing by itself: the drawing goes only when the
-  slider then moves. The approval is held by the identity of the colors and
-  history arrays, so it lapses on its own at the next edit.
+  slider then moves. The approval is held by the identity of the colors
+  array, which every edit to the drawing or its history replaces, so it
+  lapses on its own at the next one.
 - **Opening a file** (`ui/files/`): the question comes only after the file has
   decoded, so a bad file reports its failure and asks nothing.
 - **New sketch** (`ui/toolbar/useNewSketch.ts`): a blank canvas at the same
   size, with no history. Clear canvas is an undo step, so it asks nothing, but
   it leaves the drawing one undo away, in memory and in the autosave; New
-  sketch is how a drawing leaves the device.
+  sketch is how a drawing leaves the device. It clears the autosave at once
+  (see [Autosave](#autosave)).
 
 "Don't ask again" sets a flag in the store, which is not autosaved, so it
 lasts until the page is reloaded.
@@ -264,11 +295,11 @@ can turn those questions back on, so keeping them would make them permanent.
   and restoring fell from up to 265 ms to under 40. A step never changes once
   recorded, so each is converted once and remembered, by identity, and the
   steps restored are remembered as the arrays they were read from.
-- **When** (`useAutosave` in `ui/files/autosave.ts`): 500 ms after edits
-  settle, so a burst writes once; at once when the page is hidden or
-  unloaded, because a phone can end a background tab without warning. A save
-  that falls due during a stroke waits for the stroke to end rather than
-  stall the drag.
+- **When** (`autosaveSession` in `ui/autosave/`, which `useAutosave` starts
+  and stops): 500 ms after edits settle, so a burst writes once; at once when
+  the page is hidden or unloaded, because a phone can end a background tab
+  without warning. A save that falls due during a stroke waits for the stroke
+  to end rather than stall the drag.
 - **What:** the drawing as last committed (`committedDocument`). A stroke
   still being drawn is not an undo step yet, so saving its cells would keep
   paint that undo could never take away; leaving the page mid-stroke keeps
@@ -279,6 +310,36 @@ can turn those questions back on, so keeping them would make them permanent.
   there by other code, so `decodeAutosave` checks every part and rebuilds it
   from what passed. Nothing saved, a record it cannot use, or storage that
   gives no answer within 2 s: the page opens blank, with a warning in the log.
+- **Never over an unseen save:** a page writes only once it has seen what the
+  device holds. When storage failed or was late at opening, `restoreAutosave`
+  says so (`Restored`), and `App` hands that to `useAutosave`, which holds its
+  writes and reads the device first: the late answer if it comes, or a fresh
+  read before the first write. A saved drawing found then goes on the canvas
+  if the canvas has not changed since, by drawing, opening a file or anything
+  else. If it has, keeping either erases the other, so the user is asked, in
+  words that name no one cause: Restore saved drawing, or Keep this drawing,
+  which writes it at once. Without this, the first edit on a page
+  that opened blank would silently replace the saved drawing. `Restored` lives
+  outside React, so the rule holds when a crash remounts the app.
+- **Other tabs:** every tab shares the one record, so a tab left open with an
+  older drawing would otherwise write it over newer work the moment it was
+  used. After each save or clear a tab announces it on a `BroadcastChannel`
+  (`io/autosaveChannel.ts`). A tab that hears of a save, with nothing of its
+  own waiting to be written and no stroke open, reads the record and takes it
+  up, which is no change of its own to write back; one that hears of a clear
+  starts a new sketch itself, keeping its size and settings. A page restored
+  from the back-forward cache, which may have missed announcements, reads the
+  record as if it had heard of a save. Two tabs edited within the same half
+  second is the one case left: the later save wins, and the other tab then
+  takes it up.
+- **New sketch clears the device:** it empties the store at once
+  (`clearAutosave`), rather than leave the drawing there until the next save
+  would replace it, so a crash or a power cut a moment later cannot bring it
+  back. `useNewSketch` starts the new sketch in the store first and then
+  calls `clearSavedWorkspace`, and the session drops the write that change
+  scheduled, so nothing is written until something else changes; a reload
+  before then opens a default blank page. A page that has not seen the
+  device leaves it alone, since the drawing there is not one it showed.
 
 ## Dialogs
 
@@ -365,10 +426,14 @@ palette, fonts and animations, and `source("..")` limits class scanning to
 `src/`. Without that limit Tailwind also reads files such as this one, and
 turns words that happen to be utility names into CSS no element uses.
 
-- `.toolbar-control` is the shared look of every button, the swatch and the
-  settings toggle. Its pressed and expanded states are read from
+- `.control` is the shared look of every control: the toolbar's buttons, the
+  swatch, the settings toggle, and, through `TextButton`, the buttons of the
+  dialogs and the error screen. Its pressed and expanded states are read from
   `aria-pressed` and `aria-expanded`, so the look cannot disagree with what
-  assistive technology is told.
+  assistive technology is told. Keyboard focus shows the browser's own ring;
+  the swatch, whose input is transparent, wears it on its outline instead.
+- The settings icon spins only for users who have not asked for reduced
+  motion (`motion-safe:`), since it never stops.
 - Tooltips are CSS drawn from a `data-tooltip` attribute, shown on hover only
   where the device can hover, and on keyboard focus only. In the toolbar's two
   columns each label opens toward the other column, since one centered on its
@@ -378,6 +443,19 @@ turns words that happen to be utility names into CSS no element uses.
   the two symmetries, Rotate and Export PNG, Undo and Redo, then Save and
   Open. `Toolbar.test` pins the order, so changing it is a decision rather
   than an accident.
+- From `md` up the canvas and the settings panel are one size
+  (`ui/common/layout.ts`): the breakpoint's 570, 680 or 780 px, or less when
+  the window is too short, so that on a laptop screen the whole canvas is in
+  view. `main` is a size container, and the size is `clamp(540px, 100cqh -
+16px, breakpoint)`; the panel's row gap closes as it shrinks. Below 540 px
+  the panel could not hold its controls, so the page scrolls instead. A
+  window at most 800 px tall (`short:`) also gets a smaller header and footer.
+  On a screen tall enough for the breakpoint's size nothing changes.
+- Below `md` the settings panel is a popover over the canvas, opened by the
+  header's button and closed by a press anywhere outside it. That press only
+  closes it: `useToolbarPopover` takes it in the document's capture phase,
+  before React's listeners, and stops it there, so tapping the canvas to put
+  the panel away does not also paint a cell.
 - The app is dark throughout: `color-scheme: dark` styles native widgets, and
   `theme-color` in `index.html` and the web manifest keeps browser chrome and
   splash screens from flashing white.
@@ -409,10 +487,17 @@ The browser project exists because jsdom cannot prove these properties:
 - Save sketch and Export PNG write real files that decode to the drawing. That
   also shows that revoking the object URL right after the click is safe.
 - A real drop opens the file and keeps the page, and the whole workspace
-  survives a round trip through real IndexedDB.
+  survives a round trip through real IndexedDB. A save announced on the
+  browser's own `BroadcastChannel` is heard, and taken up, by another
+  channel on the page, as another tab's would be.
+- The settings icon stays still for a user who asks for reduced motion, and
+  the color swatch shows a focus ring when the keyboard reaches it
+  (`setMotionPreference` emulates the preference through Playwright).
 - The whole app fits a 320 px screen without scrolling sideways, with a
-  square canvas, and the settings panel, whose heights are fixed, holds every
-  control at each breakpoint.
+  square canvas, and the settings panel holds every control at each
+  breakpoint. On the viewports of common laptop screens the whole canvas is
+  in view, and below the smallest size the page scrolls rather than squeeze
+  the panel.
 
 The commands that catch a download and drive a finger run in Node beside
 Playwright (`browserCommands.ts`). `TEST_BROWSERS`, from the environment or
@@ -430,14 +515,94 @@ fails if it logged anything it did not ask for (`src/test/logCapture.ts`): an
 entry from the logger, or a warning or error written to the console directly,
 as React does on a real problem. A test that expects an entry asserts it with
 `expectLogged(level, source, message, data)`, or `expectInvalidInput(where)`
-for a refused value. Across the whole suite, only tests that provoke a failure
-on purpose log anything.
+for a refused value, which also checks that the report says what was wrong
+and can check the value refused. Across the whole suite, only tests that
+provoke a failure on purpose log anything.
 
-Tests that guard a limit or a hazard were checked by breaking the code they
-protect and watching them fail. Examples are the inflate cap, the bounded
-read, the pixel-exact PNG and the touch gesture rule. Coverage thresholds in
-`vite.config.ts` (100% of lines and functions) make `npm run check` fail when
-new code arrives untested.
+### Properties and models
+
+Where a rule has too many cases to pick from by hand, it is checked by
+property, with [fast-check](https://fast-check.dev/): hundreds of generated
+cases, and a failing one shrunk to its smallest form. Each property compares
+the code against a second, simpler statement of the same rule:
+
+- **The document** (`sketchDocument.model.test`). Random sequences of every
+  edit, with strokes left open, bad input and all, run against a reference
+  model that keeps whole snapshots for undo, paints every reflection by brute
+  force and floods breadth-first. After every edit the two must agree on the
+  colors, the history, the open stroke and what was reported, and an edit that
+  changes nothing must hand back its document. Each document is frozen before
+  an edit sees it, so one that changed its input would throw. A second
+  property records more steps than the history keeps, then undoes and redoes
+  past the cap.
+- **Save files** (`sketchFile.test`). Any sketch comes back exactly, at every
+  width of palette index and in RGB. Any payload decodes as a reference
+  decoder, written from the format's description, says it must. A real file,
+  damaged anyhow, settles on a valid sketch or a known reason.
+- **The autosave record** (`autosave.test`). Any workspace reads back exactly,
+  and a stored record with any part replaced by anything reads back as
+  nothing or as a whole, checked workspace.
+- **The canvas** (`Canvas.test`). After any sequence of store changes, every
+  cell of every canvas mounted shows the store's color. Any press and drag,
+  on, across and off every edge, paints exactly the cells the line tracer
+  joins within each stretch on the canvas.
+
+Smaller rules are checked exhaustively instead: the line tracer between every
+pair of cells of a 12×12 grid, and the reflections of every cell and rotation
+at every size up to 8×8. Flood fill is checked by property, against a
+breadth-first search.
+
+Every property starts from one fixed seed (`src/test/property.ts`), so a run
+is the same on every machine. `TEST_SEED` in the environment picks another, to
+explore further or to replay the seed a failure printed.
+
+### The journey
+
+`app/journey.browser.test` goes through one visit in the real app, as a person
+would. It shrinks the grid, draws, fills, erases with symmetry, undoes from the
+keyboard and redoes from the toolbar, and rotates. It then saves and exports,
+resizes past the question, opens the saved file, leaves and comes back to the
+autosave, and starts a new sketch, which leaves nothing on the device. Each
+step is checked where a person would see it: in the cells on screen, in the
+files the browser wrote, or in IndexedDB.
+
+### How strong the tests are
+
+Coverage thresholds in `vite.config.ts` are 100% of lines, statements,
+functions and branches, so `npm run check` fails when new code arrives
+untested. Coverage says only that a line ran; mutation testing says whether a
+test would notice it changing. [StrykerJS](https://stryker-mutator.io/) was run
+over `src`, and every mutant that survived was either killed by a new test or
+shown to change nothing a test could see. It found, among others:
+
+- A test that passed without testing its claim: a tab asked to start over
+  "keeping its settings" had drawn with the eraser on a blank canvas, so there
+  was nothing to start over from.
+- Gaps the example tests never reached: a tab that stopped saving its own
+  edits after taking up another tab's save, a remount answering from a device
+  read made before the crash, reads doubling up while one was under way, a
+  press past the right or bottom edge of the canvas, and a surface placed
+  anywhere but the window's corner.
+- Code no test could make matter, now gone: two checks of the resize
+  approval that the third always covered; a timer cancelled, and a flag
+  cleared, where nothing could read them after; a check for a surface the
+  pointer event itself guarantees; and one for a surface with no size, which
+  the bounds check already refuses.
+
+What survives changes what the code costs, not what it does: a preallocated
+array, a cache, an early return. Or it breaks a tie between two equally near
+cells in the line tracer, or is a class only a browser lays out, which the
+mutation run does not load: it runs the `unit` and `dom` projects only. Tests
+that guard a limit or a hazard, such as the inflate cap, the bounded read, the
+pixel-exact PNG and the touch gesture rule, were also checked by hand, by
+breaking the code they protect and watching them fail.
+
+Stryker is not a dependency. Its Vitest runner (10.0) runs no tests under
+Vitest 5, which names a test in full as `suite > test` where the runner looks
+for `suite test`, so every mutant appears to survive. To run it again, patch
+`nameParts.join(' ')` to `nameParts.join(' > ')` in the runner's
+`stryker-setup.js` and `test-helpers.js`, and give it a Vitest config with the
+browser project left out.
 
 ## Build and deployment
 
@@ -448,4 +613,4 @@ follow the base path rather than restating it.
 
 React and the icon set change only on a dependency upgrade, so they build into
 their own content-hashed `vendor` chunk (about 63 kB gzipped). An app-only
-deploy invalidates just the app chunk, about 8 kB gzipped.
+deploy invalidates just the app chunk, about 12.5 kB gzipped.

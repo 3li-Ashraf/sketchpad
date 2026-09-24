@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
     isToolbarOpen,
     onToggleToolbar,
 }) => (
-    <header className="relative py-7 text-center font-pixeled text-2xl sm:text-4xl md:static lg:text-5xl">
+    <header className="relative py-7 text-center font-pixeled text-2xl sm:text-4xl md:static lg:text-5xl md:short:py-3 lg:short:text-4xl">
         <button
             ref={toggleRef}
             type="button"
@@ -27,10 +27,16 @@ export const Header: React.FC<HeaderProps> = ({
             aria-controls={toolbarId}
             aria-expanded={isToolbarOpen}
             onClick={onToggleToolbar}
-            className="toolbar-control absolute left-[5vw] h-8 w-8 sm:h-10 sm:w-10 md:hidden"
+            className="control absolute left-[5vw] h-8 w-8 sm:h-10 sm:w-10 md:hidden"
         >
+            {/* Only for users who have not asked for less motion: it never
+                stops, which reduced motion exists to prevent. */}
             <MdSettings
-                className={isToolbarOpen ? "animate-spin" : "animate-spin-slow"}
+                className={
+                    isToolbarOpen
+                        ? "motion-safe:animate-spin"
+                        : "motion-safe:animate-spin-slow"
+                }
             />
         </button>
         <h1>Sketchpad</h1>

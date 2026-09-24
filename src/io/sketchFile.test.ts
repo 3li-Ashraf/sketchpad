@@ -8,6 +8,7 @@ import {
 } from "../domain/grid";
 import { GOLDEN_FILES } from "../test/goldenFiles";
 import { expectInvalidInput, expectLogged } from "../test/logCapture";
+import { fc } from "../test/property";
 import { artworkSketch, rainbowSketch } from "../test/sketchFixtures";
 import { type Bytes, deflate } from "./compression";
 import {
@@ -58,15 +59,60 @@ const fileWith = async (
     return file;
 };
 
-describe("round trip", () => {
-    it.each([1, 2, 3, 7, 32, MAX_GRID_SIZE])(
-        "restores a %i-cell-wide sketch exactly",
-        async (gridSize) => {
-            const sketch = artworkSketch(gridSize);
+const hex = (value: number) =>
+    `#${value.toString(16).padStart(6, "0").toUpperCase()}`;
 
-            expect(await roundTrip(sketch)).toEqual(decoded(sketch));
-        }
+/**
+ * Any sketch, weighted to the palette sizes either side of each change in
+ * index width, and past 255 colors, where the file has to switch to RGB. Every
+ * palette color is used, so the count of distinct colors is the one chosen.
+ */
+const anySketch: fc.Arbitrary<Sketch> = fc
+    .oneof(
+        fc.constantFrom(1, 2, 3, 4, 5, 8, 9, 16, 17, 32, 33, 64, 65, 128, 129),
+        fc.constantFrom(255, 256, 300),
+        fc.integer({ min: 1, max: 40 })
+    )
+    .chain((paletteSize) => {
+        const smallest = Math.ceil(Math.sqrt(paletteSize));
+
+        return fc.record({
+            palette: fc.uniqueArray(fc.integer({ min: 0, max: 0xffffff }), {
+                minLength: paletteSize,
+                maxLength: paletteSize,
+            }),
+            gridSize: fc.oneof(
+                {
+                    arbitrary: fc.integer({ min: smallest, max: smallest + 6 }),
+                    weight: 9,
+                },
+                { arbitrary: fc.constant(MAX_GRID_SIZE), weight: 1 }
+            ),
+        });
+    })
+    .chain(({ palette, gridSize }) =>
+        fc
+            .array(fc.nat(palette.length - 1), {
+                minLength: gridSize * gridSize,
+                maxLength: gridSize * gridSize,
+            })
+            .map((picks) => ({
+                gridSize,
+                colors: picks.map((pick, cell) =>
+                    hex(palette[cell < palette.length ? cell : pick])
+                ),
+            }))
     );
+
+describe("round trip", () => {
+    it("restores any sketch exactly", async () => {
+        await fc.assert(
+            fc.asyncProperty(anySketch, async (sketch) => {
+                expect(await roundTrip(sketch)).toEqual(decoded(sketch));
+            }),
+            { numRuns: 150 }
+        );
+    });
 
     it("restores a blank canvas", async () => {
         const sketch = { gridSize: 16, colors: createBlankGrid(16) };
@@ -192,6 +238,24 @@ describe("payload mode", () => {
         expect(file[5]).toBe(PALETTE_MODE);
     });
 
+    it("keeps palette mode for as many as 255 colors", async () => {
+        // 255 colors scattered cell by cell, where one byte per cell beats
+        // three by far.
+        let seed = 1;
+        const random = () => (seed = (seed * 48_271) % 0x7fffffff);
+        const palette = Array.from({ length: 255 }, (_, at) =>
+            hex(at * 0x10101)
+        );
+        const colors = Array.from(
+            { length: 64 * 64 },
+            (_, cell) => palette[cell < 255 ? cell : random() % 255]
+        );
+
+        const file = await encodeSketch({ gridSize: 64, colors });
+
+        expect(file[5]).toBe(PALETTE_MODE);
+    });
+
     it("falls back to RGB mode past 255 colors", async () => {
         const file = await encodeSketch(rainbowSketch(64));
 
@@ -272,6 +336,12 @@ describe("refusing a sketch from a format this version does not know", () => {
 });
 
 describe("refusing a damaged sketch", () => {
+    it("refuses a file of the magic bytes and nothing more", async () => {
+        expect(await decodeSketch(Uint8Array.of(...MAGIC))).toEqual(
+            rejected("damaged")
+        );
+    });
+
     it("refuses a file cut off inside the header", async () => {
         expect(await decodeSketch(Uint8Array.of(...MAGIC, 4))).toEqual(
             rejected("damaged")
@@ -352,6 +422,164 @@ describe("refusing a damaged sketch", () => {
 
         expect(await decodeSketch(bomb)).toEqual(rejected("damaged"));
         expect(read.mock.calls.length).toBeLessThan(4);
+    });
+});
+
+/**
+ * The payload as the format's own description reads, decoded a second way:
+ * null wherever the file must be refused as damaged.
+ */
+const referenceColors = (
+    payload: Uint8Array,
+    mode: number,
+    cellCount: number
+): string[] | null => {
+    const colorAt = (at: number) =>
+        hex((payload[at] << 16) | (payload[at + 1] << 8) | payload[at + 2]);
+
+    if (mode === RGB_MODE) {
+        return payload.length === cellCount * 3
+            ? Array.from({ length: cellCount }, (_, cell) => colorAt(cell * 3))
+            : null;
+    }
+
+    const paletteLength = payload.length > 0 ? payload[0] : 0;
+    let bitWidth = 1;
+    while (2 ** bitWidth < paletteLength) bitWidth++;
+    const indicesAt = 1 + paletteLength * 3;
+    const bitAt = (bit: number) =>
+        (payload[indicesAt + Math.floor(bit / 8)] >> (7 - (bit % 8))) & 1;
+
+    if (
+        paletteLength === 0 ||
+        payload.length !== indicesAt + Math.ceil((cellCount * bitWidth) / 8)
+    ) {
+        return null;
+    }
+
+    const colors: string[] = [];
+    for (let cell = 0; cell < cellCount; cell++) {
+        let index = 0;
+        for (let bit = 0; bit < bitWidth; bit++) {
+            index = index * 2 + bitAt(cell * bitWidth + bit);
+        }
+        if (index >= paletteLength) return null;
+        colors.push(colorAt(1 + index * 3));
+    }
+
+    return colors;
+};
+
+/**
+ * A payload that is well formed or nearly so: the right shape for its header
+ * or a byte either side, with palette indices that can overrun the palette
+ * and padding bits that can be anything, so both acceptance and each reason
+ * for refusal are reached.
+ */
+const anyPayload = fc
+    .record({
+        gridSize: fc.integer({ min: 1, max: 12 }),
+        mode: fc.constantFrom(PALETTE_MODE, RGB_MODE),
+        paletteLength: fc.oneof(
+            fc.integer({ min: 0, max: 9 }),
+            fc.integer({ min: 0, max: MAX_PALETTE_LENGTH })
+        ),
+        lengthError: fc.oneof(
+            { arbitrary: fc.constant(0), weight: 6 },
+            { arbitrary: fc.constantFrom(-1, 1), weight: 1 }
+        ),
+        bytes: fc.uint8Array({ minLength: 1100, maxLength: 1100 }),
+    })
+    .map(({ gridSize, mode, paletteLength, lengthError, bytes }) => {
+        const cellCount = gridSize * gridSize;
+        let bitWidth = 1;
+        while (2 ** bitWidth < paletteLength) bitWidth++;
+        const length =
+            mode === RGB_MODE
+                ? cellCount * 3
+                : 1 + paletteLength * 3 + Math.ceil((cellCount * bitWidth) / 8);
+        const payload = bytes.slice(0, Math.max(0, length + lengthError));
+        if (mode === PALETTE_MODE && payload.length > 0) {
+            payload[0] = paletteLength;
+        }
+
+        return { gridSize, mode, payload };
+    });
+
+describe("reading any payload", () => {
+    it("accepts exactly what the format allows, as the colors it describes", async () => {
+        await fc.assert(
+            fc.asyncProperty(
+                anyPayload,
+                async ({ gridSize, mode, payload }) => {
+                    const colors = referenceColors(
+                        payload,
+                        mode,
+                        gridSize * gridSize
+                    );
+
+                    expect(
+                        await decodeSketch(
+                            await fileWith(payload, { gridSize, mode })
+                        )
+                    ).toEqual(
+                        colors
+                            ? decoded({ gridSize, colors })
+                            : rejected("damaged")
+                    );
+                }
+            ),
+            { numRuns: 400 }
+        );
+    });
+
+    // Whatever is done to a real file, reading it settles: on a sketch that
+    // holds together, or on one of the reasons the dialog can explain.
+    it("settles on a valid sketch or a known reason, whatever the damage", async () => {
+        const damage = fc.oneof(
+            fc.record({
+                kind: fc.constant("set" as const),
+                at: fc.nat(),
+                value: fc.nat(255),
+            }),
+            fc.record({ kind: fc.constant("cut" as const), at: fc.nat() }),
+            fc.record({
+                kind: fc.constant("append" as const),
+                bytes: fc.uint8Array({ maxLength: 8 }),
+            })
+        );
+
+        await fc.assert(
+            fc.asyncProperty(
+                anySketch,
+                fc.array(damage, { minLength: 1, maxLength: 3 }),
+                async (sketch, damages) => {
+                    let file = await encodeSketch(sketch);
+                    for (const change of damages) {
+                        if (change.kind === "set") {
+                            file[change.at % file.length] = change.value;
+                        } else if (change.kind === "cut") {
+                            file = file.slice(0, change.at % file.length);
+                        } else {
+                            file = Uint8Array.from([...file, ...change.bytes]);
+                        }
+                    }
+
+                    const result = await decodeSketch(file);
+
+                    if (result.ok) {
+                        expect(isValidSketch(result.sketch)).toBe(true);
+                    } else {
+                        expect([
+                            "not-a-sketch",
+                            "unsupported",
+                            "damaged",
+                        ]).toContain(result.reason);
+                    }
+                }
+            ),
+            { numRuns: 150 }
+        );
     });
 });
 

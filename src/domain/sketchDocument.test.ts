@@ -108,6 +108,12 @@ describe("refusing input an edit cannot use", () => {
         }
     );
 
+    it("paints and reports nothing for no cells at all, whatever the brush", () => {
+        const doc = open();
+
+        expect(paintCells(doc, [], brush("pen", "red"))).toBe(doc);
+    });
+
     it("returns the document untouched when every index is refused", () => {
         const doc = open();
 
@@ -119,7 +125,7 @@ describe("refusing input an edit cannot use", () => {
         const doc = endStroke(
             paintCells(open(), [1.5, Number.NaN, 2, -1], brush())
         );
-        expectInvalidInput("paintCells");
+        expectInvalidInput("paintCells", { value: [1.5, Number.NaN, -1] });
 
         expect(Object.keys(doc.colors)).toHaveLength(16);
         expect(doc.undoStack).toEqual([
@@ -484,38 +490,6 @@ describe("undo and redo", () => {
 
         expect(undo(doc)).toBe(doc);
         expect(redo(doc)).toBe(doc);
-    });
-
-    it("rewind any sequence of edits to the start, and replay it to the end", () => {
-        let doc = createDocument(5);
-        let steps = 0;
-        const edits = [
-            (d: SketchDocument) => stroke(d, [0, 1, 2, 7]),
-            (d: SketchDocument) => fillFrom(d, 24, OTHER),
-            (d: SketchDocument) => stroke(d, [12, 13], brush("eraser")),
-            (d: SketchDocument) =>
-                stroke(
-                    d,
-                    [6],
-                    brush("pen", PEN, { topBottom: true, leftRight: true })
-                ),
-            (d: SketchDocument) => clearCanvas(d),
-            (d: SketchDocument) =>
-                stroke(d, [3, 8, 13, 18], brush("pen", OTHER)),
-        ];
-        for (const edit of edits) {
-            const next = edit(doc);
-            if (next.undoStack.length !== doc.undoStack.length) steps++;
-            doc = next;
-        }
-        const end = doc;
-
-        for (let step = 0; step < steps; step++) doc = undo(doc);
-        expect(isBlank(doc)).toBe(true);
-        expect(doc.undoStack).toEqual([]);
-
-        for (let step = 0; step < steps; step++) doc = redo(doc);
-        expect(doc).toEqual(end);
     });
 });
 

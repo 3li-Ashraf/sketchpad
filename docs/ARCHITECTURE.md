@@ -17,7 +17,7 @@ src/
     gridSize/  GridSizeControl, GridSizeSlider, useGridResize
     files/     useSketchFiles, fileMessages
     autosave/  restoreAutosave, autosaveSession, useAutosave
-    common/    Dialog, TextButton, isDialogOpen, Tooltip, layout
+    common/    Dialog, useConfirmation, TextButton, isDialogOpen, Tooltip, layout
   app/       App, Header, Footer, ErrorBoundary, errorReporting, and hooks
   styles/    index.css, the Tailwind entry point and design tokens
   test/      helpers, stubs and fixtures shared by the tests
@@ -82,8 +82,9 @@ input, so callers detect a no-op by identity.
 
 ## State
 
-`state/sketchStore.ts` holds `document`, `settings` and the three "ask
-before" flags. `settings` is the workspace's own `EditorSettings`
+`state/sketchStore.ts` holds `document`, `settings` and `askBefore`, which
+says whether each of the three actions that erase a drawing still asks first
+(see [Protecting a drawing](#protecting-a-drawing)). `settings` is the workspace's own `EditorSettings`
 (`domain/workspace.ts`): tool, pen color, symmetry and grid lines, as one
 object that every change replaces. So restoring puts it back whole, and
 autosave sees any change to it by identity alone.
@@ -256,13 +257,20 @@ drawing without an undo step. Each asks first whenever `hasWorkToLose` is
 true: a painted cell, or any history at all, since a cleared canvas is still
 one undo away from its drawing.
 
+All three ask the same way, through `useConfirmation` (`ui/common/`), each
+with its own words. `mustAskBefore(state, action)` in the store says whether
+the action has to ask: it still does, and there is something to lose.
+`runOrConfirm` then runs the action at once or asks first, and the dialog it
+returns carries "Don't ask again" through to `stopAskingBefore(action)`.
+
 - **Resizing** (`ui/gridSize/`): over a drawing the slider is locked. The input
   ignores the pointer, so a press cannot start a drag that would carry on
   beneath the dialog, and a key that would step it is caught first. Either one
   asks. Unlocking erases nothing by itself: the drawing goes only when the
-  slider then moves. The approval is held by the identity of the colors
-  array, which every edit to the drawing or its history replaces, so it
-  lapses on its own at the next one.
+  slider then moves. Unlocking is the one question asked unconditionally,
+  with `confirm`, since the lock has already said it must be. The approval is
+  held by the identity of the colors array, which every edit to the drawing or
+  its history replaces, so it lapses on its own at the next one.
 - **Opening a file** (`ui/files/`): the question comes only after the file has
   decoded, so a bad file reports its failure and asks nothing.
 - **New sketch** (`ui/toolbar/useNewSketch.ts`): a blank canvas at the same
@@ -271,8 +279,8 @@ one undo away from its drawing.
   sketch is how a drawing leaves the device. It clears the autosave at once
   (see [Autosave](#autosave)).
 
-"Don't ask again" sets a flag in the store, which is not autosaved, so it
-lasts until the page is reloaded.
+"Don't ask again" clears the action's entry in the store's `askBefore`,
+which is not autosaved, so it lasts until the page is reloaded.
 
 A file dropped anywhere on the page opens exactly as if it had been picked,
 question and all. Left to the browser, the drop would navigate to the file and

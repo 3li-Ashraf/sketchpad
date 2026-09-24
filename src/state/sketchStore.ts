@@ -34,6 +34,12 @@ import {
     type Workspace,
 } from "../domain/workspace";
 
+/**
+ * The edits that erase a drawing with no undo step, each asked about first
+ * while there is something to lose; see `mustAskBefore`.
+ */
+export type ConfirmedAction = "resize" | "replace" | "newSketch";
+
 interface SketchState {
     document: SketchDocument;
     /**
@@ -42,14 +48,11 @@ interface SketchState {
      */
     settings: EditorSettings;
     /**
-     * Whether resizing, opening a file, or starting a new sketch over a
-     * drawing asks first. "Don't ask again" turns one off; the workspace
-     * leaves these out of the autosave, so that lasts until the page is
-     * reloaded.
+     * Whether each confirmed action still asks. "Don't ask again" turns one
+     * off; the workspace leaves these out of the autosave, so that lasts
+     * until the page is reloaded.
      */
-    askBeforeResize: boolean;
-    askBeforeReplace: boolean;
-    askBeforeNewSketch: boolean;
+    askBefore: Readonly<Record<ConfirmedAction, boolean>>;
 }
 
 export interface SketchActions {
@@ -57,9 +60,7 @@ export interface SketchActions {
     setPenColor: (color: string) => void;
     toggleSymmetry: (axis: keyof Symmetry) => void;
     toggleGridLines: () => void;
-    stopAskingBeforeResize: () => void;
-    stopAskingBeforeReplace: () => void;
-    stopAskingBeforeNewSketch: () => void;
+    stopAskingBefore: (action: ConfirmedAction) => void;
     setGridSize: (gridSize: number) => void;
     loadSketch: (sketch: Sketch) => void;
     /** Puts back a workspace saved by an earlier visit, history and all. */
@@ -111,9 +112,7 @@ export const useSketchStore = create<SketchStore>()((set) => {
     return {
         document: createDocument(DEFAULT_GRID_SIZE),
         settings: DEFAULT_EDITOR_SETTINGS,
-        askBeforeResize: true,
-        askBeforeReplace: true,
-        askBeforeNewSketch: true,
+        askBefore: { resize: true, replace: true, newSketch: true },
 
         actions: {
             setTool: (tool) => changeSettings(() => ({ tool })),
@@ -132,9 +131,10 @@ export const useSketchStore = create<SketchStore>()((set) => {
                 changeSettings(({ showGridLines }) => ({
                     showGridLines: !showGridLines,
                 })),
-            stopAskingBeforeResize: () => set({ askBeforeResize: false }),
-            stopAskingBeforeReplace: () => set({ askBeforeReplace: false }),
-            stopAskingBeforeNewSketch: () => set({ askBeforeNewSketch: false }),
+            stopAskingBefore: (action) =>
+                set(({ askBefore }) => ({
+                    askBefore: { ...askBefore, [action]: false },
+                })),
 
             setGridSize: (gridSize) =>
                 edit((doc) => resizeDocument(doc, gridSize)),
@@ -178,6 +178,16 @@ export const selectCanRedo = (state: SketchStore): boolean =>
 
 export const selectHasWorkToLose = (state: SketchStore): boolean =>
     hasWorkToLose(state.document);
+
+/**
+ * Whether an action has to ask before it erases the drawing: it still asks,
+ * and there is something to lose. It takes the action as well as the state,
+ * so it is read from `getState()`, when the action is about to run.
+ */
+export const mustAskBefore = (
+    state: SketchStore,
+    action: ConfirmedAction
+): boolean => state.askBefore[action] && hasWorkToLose(state.document);
 
 // Derived values, built afresh on every call, so read them from
 // `useSketchStore.getState()`. As a selector, a new object each time would

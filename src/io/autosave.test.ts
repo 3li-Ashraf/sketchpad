@@ -206,7 +206,7 @@ describe("the autosave record", () => {
 
     it("keeps nothing it did not check", () => {
         const record = {
-            ...withSettings({ askBeforeResize: false }),
+            ...withSettings({ askBefore: { resize: false } }),
             document: {
                 ...base.document,
                 undoStack: [{ ...STEP, note: "ignored" }],

@@ -22,6 +22,7 @@ import {
     store,
 } from "../test/storeHelpers";
 import {
+    mustAskBefore,
     selectCanRedo,
     selectCanUndo,
     selectHasWorkToLose,
@@ -40,9 +41,11 @@ describe("initial state", () => {
         expect(store().settings.penColor).toBe(DEFAULT_PEN_COLOR);
         expect(store().settings.symmetry).toEqual(NO_SYMMETRY);
         expect(store().settings.showGridLines).toBe(true);
-        expect(store().askBeforeResize).toBe(true);
-        expect(store().askBeforeReplace).toBe(true);
-        expect(store().askBeforeNewSketch).toBe(true);
+        expect(store().askBefore).toEqual({
+            resize: true,
+            replace: true,
+            newSketch: true,
+        });
         expect(selectCanUndo(store())).toBe(false);
         expect(selectCanRedo(store())).toBe(false);
     });
@@ -93,22 +96,26 @@ describe("settings", () => {
     });
 
     it("stops asking each question independently, for the visit", () => {
-        actions().stopAskingBeforeResize();
-        expect(store().askBeforeResize).toBe(false);
-        expect(store().askBeforeReplace).toBe(true);
-        expect(store().askBeforeNewSketch).toBe(true);
+        actions().stopAskingBefore("resize");
+        expect(store().askBefore).toEqual({
+            resize: false,
+            replace: true,
+            newSketch: true,
+        });
 
-        actions().stopAskingBeforeReplace();
-        expect(store().askBeforeNewSketch).toBe(true);
+        actions().stopAskingBefore("replace");
+        expect(store().askBefore.newSketch).toBe(true);
 
-        actions().stopAskingBeforeNewSketch();
+        actions().stopAskingBefore("newSketch");
         actions().setGridSize(8);
         actions().loadSketch({ gridSize: 4, colors: createBlankGrid(4) });
         actions().startNewSketch();
 
-        expect(store().askBeforeResize).toBe(false);
-        expect(store().askBeforeReplace).toBe(false);
-        expect(store().askBeforeNewSketch).toBe(false);
+        expect(store().askBefore).toEqual({
+            resize: false,
+            replace: false,
+            newSketch: false,
+        });
     });
 });
 
@@ -282,12 +289,15 @@ describe("restoring a workspace", () => {
 
     it("leaves the questions the workspace does not keep alone", () => {
         const workspace = saved();
-        actions().stopAskingBeforeResize();
+        actions().stopAskingBefore("resize");
 
         actions().restoreWorkspace(workspace);
 
-        expect(store().askBeforeResize).toBe(false);
-        expect(store().askBeforeReplace).toBe(true);
+        expect(store().askBefore).toEqual({
+            resize: false,
+            replace: true,
+            newSketch: true,
+        });
     });
 });
 
@@ -298,6 +308,17 @@ describe("selectors and derived values", () => {
         paintStroke(0);
 
         expect(selectHasWorkToLose(store())).toBe(true);
+    });
+
+    it("ask before an action only over a drawing, until told not to", () => {
+        expect(mustAskBefore(store(), "replace")).toBe(false);
+
+        paintStroke(0);
+        expect(mustAskBefore(store(), "replace")).toBe(true);
+
+        actions().stopAskingBefore("replace");
+        expect(mustAskBefore(store(), "replace")).toBe(false);
+        expect(mustAskBefore(store(), "newSketch")).toBe(true);
     });
 
     it("give the artwork without the editor state around it", () => {

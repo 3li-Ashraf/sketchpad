@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SketchReadFailure } from "../../io/sketchFile";
-import { LOAD_FAILED, replaceTitle, replaceWarning } from "./fileMessages";
+import { LOAD_FAILED, replaceQuestion } from "./fileMessages";
 
 const REASONS = Object.keys(LOAD_FAILED) as SketchReadFailure[];
 
@@ -34,7 +34,13 @@ describe("the messages for a file that could not be opened", () => {
 
 describe("the question before a file replaces the drawing", () => {
     it("names the file, and the size of the sketch it holds", () => {
-        expect(replaceTitle("cat.skpd")).toBe("Open cat.skpd?");
-        expect(replaceWarning({ gridSize: 4, colors: [] })).toContain("4 × 4");
+        const question = replaceQuestion("cat.skpd", {
+            gridSize: 4,
+            colors: [],
+        });
+
+        expect(question.title).toBe("Open cat.skpd?");
+        expect(question.message).toContain("4 × 4");
+        expect(question.confirmLabel).toBe("Replace drawing");
     });
 });

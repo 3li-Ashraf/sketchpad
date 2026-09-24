@@ -3,20 +3,22 @@
  * lose, and ask first when it would erase a drawing.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 
-import {
-    selectHasWorkToLose,
-    useSketchActions,
-    useSketchStore,
-} from "../../state/sketchStore";
+import { useSketchActions } from "../../state/sketchStore";
 import { clearSavedWorkspace } from "../autosave/autosaveSession";
 import type { ConfirmDialogProps } from "../common/Dialog";
+import {
+    type ConfirmationCopy,
+    useConfirmation,
+} from "../common/useConfirmation";
 
-export const NEW_SKETCH_DIALOG_TITLE = "Start a new sketch?";
-
-export const NEW_SKETCH_WARNING =
-    "A new sketch erases your drawing and its undo history. This can't be undone.";
+export const NEW_SKETCH_QUESTION: ConfirmationCopy = {
+    title: "Start a new sketch?",
+    message:
+        "A new sketch erases your drawing and its undo history. This can't be undone.",
+    confirmLabel: "Start new sketch",
+};
 
 interface NewSketch {
     /** The button's action: asks first, or starts over at once. */
@@ -31,8 +33,8 @@ interface NewSketch {
  * gone from there as well.
  */
 export const useNewSketch = (): NewSketch => {
-    const { startNewSketch, stopAskingBeforeNewSketch } = useSketchActions();
-    const [isAsking, setIsAsking] = useState(false);
+    const { startNewSketch } = useSketchActions();
+    const { runOrConfirm, dialog } = useConfirmation("newSketch");
 
     // The store first: clearing then drops the save its change scheduled.
     const startOver = useCallback(() => {
@@ -40,29 +42,10 @@ export const useNewSketch = (): NewSketch => {
         clearSavedWorkspace();
     }, [startNewSketch]);
 
-    const requestNewSketch = useCallback(() => {
-        const state = useSketchStore.getState();
+    const requestNewSketch = useCallback(
+        () => runOrConfirm(NEW_SKETCH_QUESTION, startOver),
+        [runOrConfirm, startOver]
+    );
 
-        if (state.askBeforeNewSketch && selectHasWorkToLose(state)) {
-            setIsAsking(true);
-        } else {
-            startOver();
-        }
-    }, [startOver]);
-
-    const newSketchDialog: ConfirmDialogProps | null = isAsking
-        ? {
-              title: NEW_SKETCH_DIALOG_TITLE,
-              message: NEW_SKETCH_WARNING,
-              confirmLabel: "Start new sketch",
-              onConfirm: (dontAskAgain) => {
-                  if (dontAskAgain) stopAskingBeforeNewSketch();
-                  startOver();
-                  setIsAsking(false);
-              },
-              onCancel: () => setIsAsking(false),
-          }
-        : null;
-
-    return { requestNewSketch, newSketchDialog };
+    return { requestNewSketch, newSketchDialog: dialog };
 };

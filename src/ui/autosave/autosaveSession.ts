@@ -45,7 +45,7 @@ const workspaceChanged = (next: SketchStore, previous: SketchStore) =>
     !isSameCommittedDocument(next.document, previous.document);
 
 /** The choice between the drawing on the device and the canvas as it is. */
-export interface Question {
+export interface RestoreQuestion {
     restore: () => void;
     keep: () => void;
 }
@@ -68,7 +68,7 @@ export const clearSavedWorkspace = (): void => clearRunning?.();
  */
 export const startAutosave = (
     restored: Restored,
-    ask: (question: Question | null) => void
+    ask: (question: RestoreQuestion | null) => void
 ): (() => void) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     // Changed since it was last written or taken from the device. Mounted

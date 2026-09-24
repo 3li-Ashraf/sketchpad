@@ -41,8 +41,7 @@ import { Toolbar } from "../toolbar/Toolbar";
 import {
     EXPORT_FAILED,
     LOAD_FAILED,
-    replaceTitle,
-    replaceWarning,
+    replaceQuestion,
     SAVE_FAILED,
 } from "./fileMessages";
 
@@ -69,6 +68,10 @@ let recording: DownloadRecording;
 beforeEach(() => {
     recording = recordDownloads();
 });
+
+/** The replace question's title, which names the file alone. */
+const replaceTitle = (fileName: string) =>
+    replaceQuestion(fileName, artworkSketch(1)).title;
 
 describe("saving", () => {
     /**
@@ -411,8 +414,9 @@ describe("loading", () => {
             const { sketch } = await loadOverDrawing();
 
             const dialog = await findDialog();
-            expect(dialog).toHaveAccessibleName(replaceTitle("cat.skpd"));
-            expect(dialog).toHaveAccessibleDescription(replaceWarning(sketch));
+            const question = replaceQuestion("cat.skpd", sketch);
+            expect(dialog).toHaveAccessibleName(question.title);
+            expect(dialog).toHaveAccessibleDescription(question.message);
             expect(store().document.gridSize).toBe(32);
 
             await userEvent.click(button("Replace drawing"));
@@ -461,7 +465,7 @@ describe("loading", () => {
 
         it("asks independently of the resize question", async () => {
             renderToolbar();
-            actions().stopAskingBeforeResize();
+            actions().stopAskingBefore("resize");
             paintStroke(0);
 
             selectFile(await encodeSketch(smallSketch()));

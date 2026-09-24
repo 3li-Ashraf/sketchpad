@@ -245,7 +245,7 @@ describe("useAutosave", () => {
         actions().setTool(store().settings.tool);
         actions().setPenColor(store().settings.penColor);
         // A change the workspace leaves out on purpose.
-        actions().stopAskingBeforeResize();
+        actions().stopAskingBefore("resize");
 
         expect(vi.getTimerCount()).toBe(0);
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);

@@ -19,19 +19,18 @@ import {
 } from "../../io/sketchFile";
 import { createLogger } from "../../log/logger";
 import {
-    selectHasWorkToLose,
     sketchOf,
     useSketchActions,
     useSketchStore,
 } from "../../state/sketchStore";
 import type { ConfirmDialogProps, NoticeDialogProps } from "../common/Dialog";
 import { isDialogOpen } from "../common/isDialogOpen";
+import { useConfirmation } from "../common/useConfirmation";
 import {
     EXPORT_FAILED,
     type FailureCopy,
     LOAD_FAILED,
-    replaceTitle,
-    replaceWarning,
+    replaceQuestion,
     SAVE_FAILED,
 } from "./fileMessages";
 
@@ -45,11 +44,6 @@ type NextStep = "save" | "export" | "open";
 
 interface Failure extends FailureCopy {
     nextStep: NextStep;
-}
-
-interface PendingLoad {
-    fileName: string;
-    sketch: Sketch;
 }
 
 interface SketchFiles {
@@ -79,9 +73,9 @@ const carriesFiles = (event: DragEvent): boolean =>
 export const useSketchFiles = (): SketchFiles => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [failure, setFailure] = useState<Failure | null>(null);
-    const [pendingLoad, setPendingLoad] = useState<PendingLoad | null>(null);
 
-    const { loadSketch, stopAskingBeforeReplace } = useSketchActions();
+    const { loadSketch } = useSketchActions();
+    const { runOrConfirm, dialog: replaceDialog } = useConfirmation("replace");
 
     const saveSketch = useCallback(() => {
         encodeSketch(currentSketch())
@@ -122,15 +116,12 @@ export const useSketchFiles = (): SketchFiles => {
 
             // Asked only once the file is known to be good, so a bad file
             // raises its failure and nothing else.
-            const state = useSketchStore.getState();
-            if (state.askBeforeReplace && selectHasWorkToLose(state)) {
-                setPendingLoad({ fileName: file.name, sketch: result.sketch });
-                return;
-            }
-
-            loadSketch(result.sketch);
+            const { sketch } = result;
+            runOrConfirm(replaceQuestion(file.name, sketch), () =>
+                loadSketch(sketch)
+            );
         },
-        [loadSketch]
+        [loadSketch, runOrConfirm]
     );
 
     const openChosenFile = useCallback(
@@ -198,18 +189,6 @@ export const useSketchFiles = (): SketchFiles => {
             nextSteps[failure.nextStep]();
         },
         onDismiss: () => setFailure(null),
-    };
-
-    const replaceDialog: ConfirmDialogProps | null = pendingLoad && {
-        title: replaceTitle(pendingLoad.fileName),
-        message: replaceWarning(pendingLoad.sketch),
-        confirmLabel: "Replace drawing",
-        onConfirm: (dontAskAgain) => {
-            if (dontAskAgain) stopAskingBeforeReplace();
-            loadSketch(pendingLoad.sketch);
-            setPendingLoad(null);
-        },
-        onCancel: () => setPendingLoad(null),
     };
 
     return {

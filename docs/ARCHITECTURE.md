@@ -448,6 +448,11 @@ turns words that happen to be utility names into CSS no element uses.
   the panel could not hold its controls, so the page scrolls instead. A
   window at most 800 px tall (`short:`) also gets a smaller header and footer.
   On a screen tall enough for the breakpoint's size nothing changes.
+- Below `md` the settings panel is a popover over the canvas, opened by the
+  header's button and closed by a press anywhere outside it. That press only
+  closes it: `useToolbarPopover` takes it in the document's capture phase,
+  before React's listeners, and stops it there, so tapping the canvas to put
+  the panel away does not also paint a cell.
 - The app is dark throughout: `color-scheme: dark` styles native widgets, and
   `theme-color` in `index.html` and the web manifest keeps browser chrome and
   splash screens from flashing white.

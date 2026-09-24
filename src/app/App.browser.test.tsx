@@ -12,7 +12,7 @@ import "../styles/index.css";
 
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { commands, page, userEvent } from "vitest/browser";
+import { commands, page, server, userEvent } from "vitest/browser";
 
 import { App } from "./App";
 
@@ -64,6 +64,69 @@ describe("the settings panel", () => {
             });
 
             expect(panel.scrollHeight).toBeLessThanOrEqual(panel.clientHeight);
+        }
+    );
+});
+
+describe("the settings popover on a phone", () => {
+    const surface = () => screen.getByRole("img", { name: /^Canvas/ });
+
+    const isBlank = () =>
+        [...surface().querySelectorAll<HTMLElement>(":scope > * > *")].every(
+            (cell) => cell.style.backgroundColor === "rgb(255, 255, 255)"
+        );
+
+    /**
+     * A point on the canvas, relative to it, that the open popover does not
+     * cover: toward its right edge, level with its middle. Checked, so a test
+     * cannot pass by pressing the popover instead.
+     */
+    const uncoveredPoint = () => {
+        const canvas = surface().getBoundingClientRect();
+        const point = { x: canvas.width - 12, y: canvas.height / 2 };
+        const hit = document.elementFromPoint(
+            canvas.left + point.x,
+            canvas.top + point.y
+        );
+        expect(surface().contains(hit)).toBe(true);
+
+        return point;
+    };
+
+    const openSettings = async () => {
+        await page.viewport(375, 700);
+        render(<App />);
+        await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+    };
+
+    it("closes at a click on the canvas, and only the next click draws", async () => {
+        await openSettings();
+        const position = uncoveredPoint();
+
+        await userEvent.click(surface(), { position });
+
+        expect(
+            screen.getByRole("button", { name: "Settings" })
+        ).toHaveAttribute("aria-expanded", "false");
+        expect(isBlank()).toBe(true);
+
+        await userEvent.click(surface(), { position });
+
+        expect(isBlank()).toBe(false);
+    });
+
+    it.runIf(server.browser === "chromium")(
+        "closes at a finger's tap on the canvas without drawing",
+        async () => {
+            await openSettings();
+            const point = uncoveredPoint();
+
+            await commands.touchDrag('[role="img"]', point, point, 1);
+
+            expect(
+                screen.getByRole("button", { name: "Settings" })
+            ).toHaveAttribute("aria-expanded", "false");
+            expect(isBlank()).toBe(true);
         }
     );
 });

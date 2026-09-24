@@ -127,6 +127,68 @@ describe("collapsible toolbar", () => {
         expect(toolbar()).toHaveClass("hidden");
     });
 
+    describe("closed by a press on the canvas", () => {
+        /** A size for the canvas, which jsdom never lays out, so it can paint. */
+        const layOutCanvas = () =>
+            vi.spyOn(canvas(), "getBoundingClientRect").mockReturnValue({
+                x: 0,
+                y: 0,
+                top: 0,
+                left: 0,
+                right: 320,
+                bottom: 320,
+                width: 320,
+                height: 320,
+                toJSON: () => ({}),
+            });
+
+        const pressCanvas = () => {
+            fireEvent.pointerDown(canvas(), {
+                pointerId: 1,
+                button: 0,
+                clientX: 5,
+                clientY: 5,
+            });
+            fireEvent.pointerUp(window, { pointerId: 1 });
+        };
+
+        it("only closes, drawing nothing", async () => {
+            render(<App />);
+            layOutCanvas();
+            await userEvent.click(toggle());
+
+            pressCanvas();
+
+            expect(toolbar()).toHaveClass("hidden");
+            expect(canvasColors()[0]).toBe(BLANK_CELL_COLOR);
+            expect(store().document.undoStack).toEqual([]);
+        });
+
+        it("draws as usual at the next press", async () => {
+            render(<App />);
+            layOutCanvas();
+            await userEvent.click(toggle());
+            pressCanvas();
+
+            pressCanvas();
+
+            expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
+        });
+
+        it("draws at once where the panel is no popover, having been left open", async () => {
+            // Opened on a narrow screen that then widened past `md`, where
+            // the toggle is hidden and the panel always shown.
+            render(<App />);
+            layOutCanvas();
+            await userEvent.click(toggle());
+            toggle().style.display = "none";
+
+            pressCanvas();
+
+            expect(canvasColors()[0]).toBe(DEFAULT_PEN_COLOR);
+        });
+    });
+
     it("stays open when a pointer goes down inside it", async () => {
         render(<App />);
 
@@ -160,7 +222,8 @@ describe("collapsible toolbar", () => {
 
         expect(remove).toHaveBeenCalledWith(
             "pointerdown",
-            expect.any(Function)
+            expect.any(Function),
+            true
         );
     });
 });

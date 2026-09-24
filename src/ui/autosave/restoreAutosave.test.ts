@@ -106,6 +106,17 @@ describe("restoreAutosave", () => {
         expectLogged("warn", "autosave", "autosave could not be read");
     });
 
+    it("leaves no timer running once storage has answered", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        vi.mocked(readAutosave).mockResolvedValueOnce(null);
+
+        await restoreAutosave();
+        const timers = vi.getTimerCount();
+        vi.useRealTimers();
+
+        expect(timers).toBe(0);
+    });
+
     it("gives up when storage does not answer in time, handing on the read", async () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
         vi.spyOn(indexedDB, "open").mockReturnValue({} as IDBOpenDBRequest);

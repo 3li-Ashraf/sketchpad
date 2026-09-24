@@ -99,9 +99,12 @@ export const startAutosave = (
         isFailing = true;
     };
 
-    /** Brings the store in line with the device, which is nothing to write. */
+    /**
+     * Brings the store in line with the device, which is nothing to write.
+     * A save can be waiting only when the late answer is taken up, and the
+     * `know` that follows then cancels it.
+     */
     const takeUp = (change: () => void) => {
-        clearTimeout(timer);
         isPending = false;
         isAdopting = true;
         try {
@@ -218,8 +221,9 @@ export const startAutosave = (
         }
 
         const heard = changesHeard;
+        // Either answer makes the device known, after which `isAsking` is
+        // never read again, so it is left as it is.
         const answered = (choice: () => void) => () => {
-            isAsking = false;
             ask(null);
             choice();
         };

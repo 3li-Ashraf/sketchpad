@@ -28,7 +28,10 @@ import {
     readAutosave,
     writeAutosave,
 } from "../../io/autosave";
-import { openAutosaveChannel } from "../../io/autosaveChannel";
+import {
+    type AutosaveChannel,
+    openAutosaveChannel,
+} from "../../io/autosaveChannel";
 import { workspaceOf } from "../../state/sketchStore";
 import {
     deleteAutosaveDatabase,
@@ -152,6 +155,16 @@ describe("useAutosave", () => {
         expect(await saved()).toEqual(workspaceOf(store()));
     });
 
+    it("writes nothing at mount, and sets no save going, over a drawing just restored", async () => {
+        // As `restoreAutosave` leaves the store before the app mounts.
+        paintStroke(0);
+        render(<Autosaving />);
+
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        expect(writes()).toBe(0);
+    });
+
     it("writes once for a burst of changes", async () => {
         render(<Autosaving />);
         paintStroke(0);
@@ -231,6 +244,7 @@ describe("useAutosave", () => {
         // A change the workspace leaves out on purpose.
         actions().stopAskingBeforeResize();
 
+        expect(vi.getTimerCount()).toBe(0);
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
 
         expect(writes()).toBe(0);
@@ -262,6 +276,8 @@ describe("useAutosave", () => {
         window.dispatchEvent(new Event("pagehide"));
 
         expect(writes()).toBe(1);
+        // The save that was due is not left to run again.
+        expect(vi.getTimerCount()).toBe(0);
     });
 
     it("saves pending work when it stops", () => {
@@ -273,16 +289,29 @@ describe("useAutosave", () => {
         expect(writes()).toBe(1);
     });
 
+    it("starts afresh on what a new restored handle knows", async () => {
+        const { rerender } = render(<Autosaving />);
+
+        rerender(<Autosaving restored={{ isKnown: false, answer: null }} />);
+        paintStroke(0);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+
+        // Held back until the device is read, as the new handle asks.
+        expect(readAutosave).toHaveBeenCalledOnce();
+        expect(writes()).toBe(0);
+    });
+
     it("warns once for a run of failed saves, and again after a success", async () => {
         render(<Autosaving />);
         const write = vi.mocked(writeAutosave);
-        write.mockRejectedValue(new Error("storage full"));
+        const error = new Error("storage full");
+        write.mockRejectedValue(error);
 
         paintStroke(0);
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
         paintStroke(1);
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
-        expectLogged("warn", "autosave", "autosave failed");
+        expectLogged("warn", "autosave", "autosave failed", { error });
 
         write.mockResolvedValueOnce();
         paintStroke(2);
@@ -293,6 +322,81 @@ describe("useAutosave", () => {
         expectLogged("warn", "autosave", "autosave failed");
     });
 });
+
+/**
+ * Whatever a page listens for, from mounting until it stops, as the
+ * listeners added and removed on `target`.
+ */
+const watchListeners = (target: EventTarget) => ({
+    added: vi.spyOn(target, "addEventListener"),
+    removed: vi.spyOn(target, "removeEventListener"),
+});
+
+describe("useAutosave, once it stops", () => {
+    it("stops listening to the page, removing every listener it added", () => {
+        const onWindow = watchListeners(window);
+        const onDocument = watchListeners(document);
+        const { unmount } = render(<Autosaving />);
+
+        unmount();
+
+        for (const [{ added, removed }, type] of [
+            [onWindow, "pagehide"],
+            [onWindow, "pageshow"],
+            [onDocument, "visibilitychange"],
+        ] as const) {
+            const listener = added.mock.calls.find(
+                ([addedType]) => addedType === type
+            )?.[1];
+            expect(listener).toBeDefined();
+            expect(removed).toHaveBeenCalledWith(type, listener);
+        }
+    });
+
+    it("closes its line to the other tabs", () => {
+        const { unmount } = render(<Autosaving />);
+        const close = vi.spyOn(sessionChannel(), "close");
+
+        unmount();
+
+        expect(close).toHaveBeenCalledOnce();
+    });
+
+    it("announces nothing on its closed line, though its last save completes", async () => {
+        const { unmount } = render(<Autosaving />);
+        const announce = vi.spyOn(sessionChannel(), "announce");
+        paintStroke(0);
+
+        unmount();
+        await vi.mocked(writeAutosave).mock.results[0].value;
+
+        expect(announce).not.toHaveBeenCalled();
+    });
+
+    it("leaves New sketch to the session still running", async () => {
+        const first = render(<Autosaving />);
+        render(<Autosaving />);
+        paintStroke(0);
+        window.dispatchEvent(new Event("pagehide"));
+        await Promise.all(
+            vi
+                .mocked(writeAutosave)
+                .mock.results.map(({ value }) => value as Promise<void>)
+        );
+        first.unmount();
+
+        actions().startNewSketch();
+        clearSavedWorkspace();
+        await vi.mocked(clearAutosave).mock.results.at(-1)?.value;
+
+        expect(clearAutosave).toHaveBeenCalledOnce();
+        expect(await readStoredRecord()).toBeUndefined();
+    });
+});
+
+/** The channel the mounted autosave opened, the first one a test opens. */
+const sessionChannel = () =>
+    vi.mocked(openAutosaveChannel).mock.results[0].value as AutosaveChannel;
 
 /** The last read of the device that autosave began. */
 const lastRead = () =>
@@ -396,6 +500,8 @@ describe("useAutosave when opening could not read the device", () => {
         expect(workspaceOf(store())).toEqual(EARLIER);
         expect(writes()).toBe(0);
         expect(restored.isKnown).toBe(true);
+        // No other tab saved while it asked, so there is nothing to read again.
+        expect(readAutosave).toHaveBeenCalledOnce();
     });
 
     it("keeps the new drawing when asked to, and writes it over the saved one", async () => {
@@ -502,6 +608,82 @@ describe("useAutosave when opening could not read the device", () => {
         expect(await saved()).toEqual(EARLIER);
     });
 
+    it("asks about what the device holds after a crash, not what it held before", async () => {
+        const { restored, answer } = await openLate();
+        const crashed = render(<Autosaving restored={restored} />);
+        paintStroke(0);
+        await answer(EARLIER);
+        crashed.unmount();
+        const later = drawing("#654321");
+        await keepOnDevice(later);
+
+        render(<Autosaving restored={restored} />);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        await act(() => lastRead());
+        fireEvent.click(button("Restore saved drawing"));
+
+        expect(workspaceOf(store())).toEqual(later);
+    });
+
+    it("reads the device once at a time, however many saves fall due", async () => {
+        const reading = deferred<Workspace | null>();
+        vi.mocked(readAutosave).mockReturnValueOnce(reading.promise);
+        render(<Autosaving restored={{ isKnown: false, answer: null }} />);
+
+        paintStroke(0);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        paintStroke(1);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+
+        expect(readAutosave).toHaveBeenCalledOnce();
+    });
+
+    it("reads nothing more while its question is up", async () => {
+        const { restored, answer } = await openLate();
+        render(<Autosaving restored={restored} />);
+        paintStroke(0);
+        await answer(EARLIER);
+        const reads = vi.mocked(readAutosave).mock.calls.length;
+
+        paintStroke(1);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+
+        expect(readAutosave).toHaveBeenCalledTimes(reads);
+        expect(writes()).toBe(0);
+    });
+
+    it("starts no read once it has stopped", () => {
+        const { unmount } = render(
+            <Autosaving restored={{ isKnown: false, answer: null }} />
+        );
+        paintStroke(0);
+
+        unmount();
+
+        expect(readAutosave).not.toHaveBeenCalled();
+        expect(writes()).toBe(0);
+    });
+
+    it("warns afresh for a failed write once the device could be read again", async () => {
+        vi.mocked(readAutosave).mockRejectedValueOnce(new Error("unavailable"));
+        vi.mocked(writeAutosave).mockRejectedValueOnce(new Error("full"));
+        render(<Autosaving restored={{ isKnown: false, answer: null }} />);
+        paintStroke(0);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        expectLogged("warn", "autosave", "autosave failed");
+
+        // Read at the next save, and found empty, so the write goes ahead.
+        paintStroke(1);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        await act(() => lastRead());
+        await vi.waitFor(() => expect(writes()).toBe(1));
+        await (
+            vi.mocked(writeAutosave).mock.results[0].value as Promise<void>
+        ).catch(() => {});
+
+        expectLogged("warn", "autosave", "autosave failed");
+    });
+
     it.each([
         ["answers", "resolve"],
         ["fails", "reject"],
@@ -555,6 +737,18 @@ describe("useAutosave with other tabs", () => {
         expect(writes()).toBe(0);
     });
 
+    it("saves its own edits after taking up another tab's save", async () => {
+        render(<Autosaving />);
+        await keepOnDevice(EARLIER);
+        hearSaveElsewhere();
+        await lastRead();
+
+        paintStroke(0);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+
+        expect(writes()).toBe(1);
+    });
+
     it("hears another tab through the channel", async () => {
         render(<Autosaving />);
 
@@ -565,6 +759,7 @@ describe("useAutosave with other tabs", () => {
 
     it("tells the other tabs once it has saved", async () => {
         render(<Autosaving />);
+        const announce = vi.spyOn(sessionChannel(), "announce");
         const heard = vi.fn();
         const otherTab = openAutosaveChannel(heard);
         onTestFinished(otherTab.close);
@@ -574,6 +769,7 @@ describe("useAutosave with other tabs", () => {
         await vi.mocked(writeAutosave).mock.results[0].value;
 
         await vi.waitFor(() => expect(heard).toHaveBeenCalledTimes(1));
+        expect(announce).toHaveBeenCalledExactlyOnceWith("saved");
     });
 
     it("keeps its own drawing when another tab saves before it has written it", async () => {
@@ -694,11 +890,13 @@ describe("useAutosave on a new sketch", () => {
 
     /** A drawing on the canvas, written to the device, with nothing waiting. */
     const drawnAndSaved = async () => {
-        render(<Autosaving />);
+        const rendered = render(<Autosaving />);
         paintStroke(0);
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
         await vi.mocked(writeAutosave).mock.results[0].value;
         expect(await readStoredRecord()).toBeDefined();
+
+        return rendered;
     };
 
     it("empties the device at once, and writes nothing after", async () => {
@@ -708,6 +906,7 @@ describe("useAutosave on a new sketch", () => {
 
         expect(await readStoredRecord()).toBeUndefined();
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        window.dispatchEvent(new Event("pagehide"));
         expect(writes()).toBe(1);
         expect(await readStoredRecord()).toBeUndefined();
     });
@@ -718,6 +917,7 @@ describe("useAutosave on a new sketch", () => {
         paintStroke(0);
 
         await startOver();
+        expect(vi.getTimerCount()).toBe(0);
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
 
         expect(writes()).toBe(0);
@@ -759,6 +959,35 @@ describe("useAutosave on a new sketch", () => {
         );
     });
 
+    it("announces no clear once it has stopped, its line closed", async () => {
+        const { unmount } = await drawnAndSaved();
+        const clearing = deferred<void>();
+        vi.mocked(clearAutosave).mockReturnValueOnce(clearing.promise);
+        const announce = vi.spyOn(sessionChannel(), "announce");
+        actions().startNewSketch();
+        clearSavedWorkspace();
+
+        unmount();
+        clearing.resolve();
+        await clearing.promise;
+
+        expect(announce).not.toHaveBeenCalled();
+    });
+
+    it("warns afresh for a failed write once the device could be cleared", async () => {
+        render(<Autosaving />);
+        vi.mocked(writeAutosave).mockRejectedValue(new Error("full"));
+        paintStroke(0);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+        expectLogged("warn", "autosave", "autosave failed");
+
+        await startOver();
+        paintStroke(1);
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
+
+        expectLogged("warn", "autosave", "autosave failed");
+    });
+
     it("warns when the device cannot be cleared", async () => {
         await drawnAndSaved();
         vi.mocked(clearAutosave).mockRejectedValueOnce(new Error("denied"));
@@ -797,8 +1026,8 @@ describe("useAutosave when another tab starts a new sketch", () => {
     it("starts over too, keeping its size and settings, and writes nothing", async () => {
         render(<Autosaving />);
         actions().setGridSize(8);
-        actions().setTool("eraser");
         paintStroke(0);
+        actions().setTool("eraser");
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
 
         hearElsewhere("cleared");

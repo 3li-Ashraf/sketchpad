@@ -68,6 +68,51 @@ describe("the settings panel", () => {
     );
 });
 
+describe("on a laptop screen", () => {
+    // Viewports as a browser leaves them on common laptop screens, beneath
+    // its tabs and toolbar.
+    it.each([
+        ["1366×768", 1366, 657],
+        ["1536×864 at 125%", 1536, 730],
+        ["1280×800", 1280, 689],
+        ["1440×900", 1440, 789],
+        ["iPad in landscape", 1024, 700],
+    ])(
+        "keeps the whole canvas in view on %s, square, with every control in the panel",
+        async (_, width, height) => {
+            await page.viewport(width, height);
+            render(<App />);
+            await document.fonts.ready;
+
+            const canvas = screen
+                .getByRole("img", { name: /^Canvas/ })
+                .parentElement!.getBoundingClientRect();
+            const panel = screen.getByRole("complementary", {
+                name: "Settings",
+            });
+
+            expect(canvas.bottom).toBeLessThanOrEqual(height);
+            expect(Math.abs(canvas.width - canvas.height)).toBeLessThan(1);
+            expect(panel.scrollHeight).toBeLessThanOrEqual(panel.clientHeight);
+        }
+    );
+
+    it("scrolls, rather than shrink the panel past holding its controls", async () => {
+        await page.viewport(1280, 480);
+        render(<App />);
+        await document.fonts.ready;
+
+        const canvas = screen
+            .getByRole("img", { name: /^Canvas/ })
+            .parentElement!.getBoundingClientRect();
+        const panel = screen.getByRole("complementary", { name: "Settings" });
+
+        expect(Math.round(canvas.height)).toBe(540);
+        expect(panel.scrollHeight).toBeLessThanOrEqual(panel.clientHeight);
+        expect(document.documentElement.scrollHeight).toBeGreaterThan(480);
+    });
+});
+
 describe("motion and focus", () => {
     afterEach(async () => {
         await commands.setMotionPreference("default");

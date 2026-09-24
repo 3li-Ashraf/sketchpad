@@ -440,6 +440,14 @@ turns words that happen to be utility names into CSS no element uses.
   the two symmetries, Rotate and Export PNG, Undo and Redo, then Save and
   Open. `Toolbar.test` pins the order, so changing it is a decision rather
   than an accident.
+- From `md` up the canvas and the settings panel are one size
+  (`ui/common/layout.ts`): the breakpoint's 570, 680 or 780 px, or less when
+  the window is too short, so that on a laptop screen the whole canvas is in
+  view. `main` is a size container, and the size is `clamp(540px, 100cqh -
+16px, breakpoint)`; the panel's row gap closes as it shrinks. Below 540 px
+  the panel could not hold its controls, so the page scrolls instead. A
+  window at most 800 px tall (`short:`) also gets a smaller header and footer.
+  On a screen tall enough for the breakpoint's size nothing changes.
 - The app is dark throughout: `color-scheme: dark` styles native widgets, and
   `theme-color` in `index.html` and the web manifest keeps browser chrome and
   splash screens from flashing white.
@@ -478,8 +486,10 @@ The browser project exists because jsdom cannot prove these properties:
   the color swatch shows a focus ring when the keyboard reaches it
   (`setMotionPreference` emulates the preference through Playwright).
 - The whole app fits a 320 px screen without scrolling sideways, with a
-  square canvas, and the settings panel, whose heights are fixed, holds every
-  control at each breakpoint.
+  square canvas, and the settings panel holds every control at each
+  breakpoint. On the viewports of common laptop screens the whole canvas is
+  in view, and below the smallest size the page scrolls rather than squeeze
+  the panel.
 
 The commands that catch a download and drive a finger run in Node beside
 Playwright (`browserCommands.ts`). `TEST_BROWSERS`, from the environment or

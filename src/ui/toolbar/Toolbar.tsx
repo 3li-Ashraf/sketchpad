@@ -22,7 +22,11 @@ import {
     useSketchStore,
 } from "../../state/sketchStore";
 import { ConfirmDialog, NoticeDialog } from "../common/Dialog";
-import { EDITOR_PANEL_HEIGHT, TOOLBAR_PANEL_HEIGHT } from "../common/layout";
+import {
+    EDITOR_PANEL_HEIGHT,
+    TOOLBAR_PANEL_HEIGHT,
+    TOOLBAR_ROW_GAP,
+} from "../common/layout";
 import { useSketchFiles } from "../files/useSketchFiles";
 import { GridSizeControl } from "../gridSize/GridSizeControl";
 import { ColorPicker } from "./ColorPicker";
@@ -80,7 +84,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, id, isOpen }) => {
 
             {/* Two controls to a row, in the order the owner chose;
                 `Toolbar.test` pins it, so a change is deliberate. */}
-            <div className="toolbar-grid grid grid-cols-2 place-items-center gap-x-4 gap-y-3 lg:gap-5 xl:gap-8">
+            <div
+                className={`toolbar-grid grid grid-cols-2 place-items-center gap-x-4 lg:gap-x-5 xl:gap-x-8 ${TOOLBAR_ROW_GAP}`}
+            >
                 <ToolButton tool="pen" />
 
                 <ToolButton tool="eraser" />

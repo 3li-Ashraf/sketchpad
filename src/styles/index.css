@@ -3,6 +3,10 @@
    happen to be utility names into CSS no element uses. */
 @import "tailwindcss" source("..");
 
+/* A window too short for the editor at its breakpoint's size, as on most
+   laptops, where the header and footer give some of their height back. */
+@custom-variant short (@media (max-height: 800px));
+
 /* The design tokens; Tailwind generates `bg-surface`, `font-pixeled` and the
    rest from these, so there is no JS config. */
 @theme {

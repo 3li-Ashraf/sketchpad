@@ -4,6 +4,7 @@ import type { Restored } from "../ui/autosave/restoreAutosave";
 import { useAutosave } from "../ui/autosave/useAutosave";
 import { Canvas } from "../ui/canvas/Canvas";
 import { NoticeDialog } from "../ui/common/Dialog";
+import { EDITOR_AREA } from "../ui/common/layout";
 import { Toolbar } from "../ui/toolbar/Toolbar";
 import { Footer } from "./Footer";
 import { Header } from "./Header";
@@ -29,7 +30,9 @@ export const App: React.FC<AppProps> = ({ restored }) => {
                 isToolbarOpen={toolbar.isOpen}
                 onToggleToolbar={toolbar.toggle}
             />
-            <main className="flex flex-auto items-center justify-around 2xl:relative 2xl:justify-center">
+            <main
+                className={`flex flex-auto items-center justify-around 2xl:relative 2xl:justify-center ${EDITOR_AREA}`}
+            >
                 <Toolbar
                     ref={toolbar.panelRef}
                     id={toolbar.panelId}

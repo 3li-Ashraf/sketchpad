@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
     isToolbarOpen,
     onToggleToolbar,
 }) => (
-    <header className="relative py-7 text-center font-pixeled text-2xl sm:text-4xl md:static lg:text-5xl">
+    <header className="relative py-7 text-center font-pixeled text-2xl sm:text-4xl md:static lg:text-5xl md:short:py-3 lg:short:text-4xl">
         <button
             ref={toggleRef}
             type="button"

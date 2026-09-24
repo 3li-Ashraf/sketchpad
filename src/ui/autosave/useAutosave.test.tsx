@@ -22,16 +22,12 @@ import {
 } from "../../domain/grid";
 import { DEFAULT_PEN_COLOR } from "../../domain/tools";
 import type { Workspace } from "../../domain/workspace";
-import {
-    clearAutosave,
-    encodeAutosave,
-    readAutosave,
-    writeAutosave,
-} from "../../io/autosave";
+import { clearAutosave, readAutosave, writeAutosave } from "../../io/autosave";
 import {
     type AutosaveChannel,
     openAutosaveChannel,
 } from "../../io/autosaveChannel";
+import { encodeAutosave } from "../../io/autosaveRecord";
 import { workspaceOf } from "../../state/sketchStore";
 import {
     deleteAutosaveDatabase,

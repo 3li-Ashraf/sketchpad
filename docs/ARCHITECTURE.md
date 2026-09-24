@@ -9,7 +9,7 @@ a line needs one; this document holds the reasoning that spans files.
 src/
   log/       the logger, which every layer may use
   domain/    pure rules: grid, color, line, tools, history, sketchDocument, workspace
-  io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosave, autosaveChannel
+  io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosaveRecord, autosave, autosaveChannel
   state/     sketchStore, the one Zustand store
   ui/
     canvas/    Canvas, CanvasRow, CanvasCell, useCellColor, usePaintGestures
@@ -300,12 +300,13 @@ can turn those questions back on, so keeping them would make them permanent.
   history can outgrow `localStorage`'s few megabytes, and IndexedDB stores
   structured values without JSON. Each call opens and closes the database, so
   no connection is held that could block another tab from upgrading it.
-- **How:** the record is not the workspace as memory holds it. Each undo step
-  is stored as three typed arrays (the cells, and their colors before and
-  after as `0xRRGGBB`) instead of an object per cell. With a full history of
-  64×64 fills, the browser spent 120 to 330 ms copying those objects into
-  storage, on the main thread, at every save; the arrays copy in 2 to 6 ms,
-  and restoring fell from up to 265 ms to under 40. A step never changes once
+- **How** (`io/autosaveRecord.ts`, the only definition of the record): the
+  record is not the workspace as memory holds it. Each undo step is stored as
+  three typed arrays (the cells, and their colors before and after as
+  `0xRRGGBB`) instead of an object per cell. With a full history of 64×64
+  fills, the browser spent 120 to 330 ms copying those objects into storage,
+  on the main thread, at every save; the arrays copy in 2 to 6 ms, and
+  restoring fell from up to 265 ms to under 40. A step never changes once
   recorded, so each is converted once and remembered, by identity, and the
   steps restored are remembered as the arrays they were read from.
 - **When** (`autosaveSession` in `ui/autosave/`, which `useAutosave` starts
@@ -555,7 +556,7 @@ the code against a second, simpler statement of the same rule:
   width of palette index and in RGB. Any payload decodes as a reference
   decoder, written from the format's description, says it must. A real file,
   damaged anyhow, settles on a valid sketch or a known reason.
-- **The autosave record** (`autosave.test`). Any workspace reads back exactly,
+- **The autosave record** (`autosaveRecord.test`). Any workspace reads back exactly,
   and a stored record with any part replaced by anything reads back as
   nothing or as a whole, checked workspace.
 - **The canvas** (`Canvas.test`). After any sequence of store changes, every

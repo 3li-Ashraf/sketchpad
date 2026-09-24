@@ -11,7 +11,7 @@ import {
     CANVAS_FRAME_PADDING,
     CANVAS_FRAME_WIDTH,
     EDITOR_PANEL_HEIGHT,
-} from "../common/panelSize";
+} from "../common/layout";
 import { CanvasRow } from "./CanvasRow";
 import { usePaintGestures } from "./usePaintGestures";
 

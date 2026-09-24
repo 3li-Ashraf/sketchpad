@@ -43,7 +43,7 @@
 
   /* The bordered control shared by toolbar buttons, the swatch, the settings
      toggle and dialog buttons. Size is left to utilities, a later layer. */
-  .toolbar-control {
+  .control {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -62,14 +62,14 @@
   /* Read from the ARIA attributes, so the look cannot disagree with what
      assistive technology is told. `:active` only on buttons: the swatch must
      keep showing its color while pressed. */
-  .toolbar-control[aria-pressed="true"],
-  .toolbar-control[aria-expanded="true"],
-  button.toolbar-control:active {
+  .control[aria-pressed="true"],
+  .control[aria-expanded="true"],
+  button.control:active {
     background-color: var(--color-accent);
     color: var(--color-surface);
   }
 
-  .toolbar-control:disabled {
+  .control:disabled {
     opacity: 0.4;
     cursor: default;
   }

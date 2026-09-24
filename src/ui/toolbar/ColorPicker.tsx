@@ -18,7 +18,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     <Tooltip label="Color">
         <label
             style={{ backgroundColor: color }}
-            className="toolbar-control cursor-pointer"
+            className="control cursor-pointer"
         >
             <input
                 type="color"

@@ -27,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
             aria-controls={toolbarId}
             aria-expanded={isToolbarOpen}
             onClick={onToggleToolbar}
-            className="toolbar-control absolute left-[5vw] h-8 w-8 sm:h-10 sm:w-10 md:hidden"
+            className="control absolute left-[5vw] h-8 w-8 sm:h-10 sm:w-10 md:hidden"
         >
             <MdSettings
                 className={isToolbarOpen ? "animate-spin" : "animate-spin-slow"}

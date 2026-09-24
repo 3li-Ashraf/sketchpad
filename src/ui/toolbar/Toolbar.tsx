@@ -4,7 +4,6 @@
  * features of their own, in `ui/gridSize` and `ui/files`.
  */
 
-import { BiSolidEraser } from "react-icons/bi";
 import { FaRedo, FaUndo } from "react-icons/fa";
 import {
     FiDownload,
@@ -13,8 +12,6 @@ import {
     FiTrash2,
     FiUpload,
 } from "react-icons/fi";
-import { HiPencil } from "react-icons/hi2";
-import { IoMdColorFill } from "react-icons/io";
 import { TbBorderAll, TbFlipHorizontal, TbFlipVertical } from "react-icons/tb";
 
 import { SKETCH_FILE_EXTENSION } from "../../io/sketchFile";
@@ -25,13 +22,13 @@ import {
     useSketchStore,
 } from "../../state/sketchStore";
 import { ConfirmDialog, NoticeDialog } from "../common/Dialog";
-import { EDITOR_PANEL_HEIGHT, TOOLBAR_PANEL_HEIGHT } from "../common/panelSize";
+import { EDITOR_PANEL_HEIGHT, TOOLBAR_PANEL_HEIGHT } from "../common/layout";
 import { useSketchFiles } from "../files/useSketchFiles";
 import { GridSizeControl } from "../gridSize/GridSizeControl";
-import { ColorfulPenIcon } from "./ColorfulPenIcon";
 import { ColorPicker } from "./ColorPicker";
 import { RotateRightIcon } from "./RotateRightIcon";
 import { ToolbarButton } from "./ToolbarButton";
+import { ToolButton } from "./ToolButton";
 import { useNewSketch } from "./useNewSketch";
 
 interface ToolbarProps {
@@ -43,7 +40,6 @@ interface ToolbarProps {
 
 export const Toolbar: React.FC<ToolbarProps> = ({ ref, id, isOpen }) => {
     const penColor = useSketchStore((state) => state.penColor);
-    const tool = useSketchStore((state) => state.tool);
     const symmetry = useSketchStore((state) => state.symmetry);
     const showGridLines = useSketchStore((state) => state.showGridLines);
     const canUndo = useSketchStore(selectCanUndo);
@@ -53,7 +49,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, id, isOpen }) => {
         undo,
         redo,
         setPenColor,
-        setTool,
         clearCanvas,
         rotateCanvas,
         toggleSymmetry,
@@ -86,39 +81,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({ ref, id, isOpen }) => {
             {/* Two controls to a row, in the order the owner chose;
                 `Toolbar.test` pins it, so a change is deliberate. */}
             <div className="toolbar-grid grid grid-cols-2 place-items-center gap-x-4 gap-y-3 lg:gap-5 xl:gap-8">
-                <ToolbarButton
-                    label="Pen"
-                    isActive={tool === "pen"}
-                    onClick={() => setTool("pen")}
-                >
-                    <HiPencil />
-                </ToolbarButton>
+                <ToolButton tool="pen" />
 
-                <ToolbarButton
-                    label="Eraser"
-                    isActive={tool === "eraser"}
-                    onClick={() => setTool("eraser")}
-                >
-                    <BiSolidEraser />
-                </ToolbarButton>
+                <ToolButton tool="eraser" />
 
-                <ToolbarButton
-                    label="Fill"
-                    isActive={tool === "fill"}
-                    onClick={() => setTool("fill")}
-                >
-                    <IoMdColorFill />
-                </ToolbarButton>
+                <ToolButton tool="fill" />
 
                 <ColorPicker color={penColor} onChange={setPenColor} />
 
-                <ToolbarButton
-                    label="Colorful pen"
-                    isActive={tool === "colorfulPen"}
-                    onClick={() => setTool("colorfulPen")}
-                >
-                    <ColorfulPenIcon />
-                </ToolbarButton>
+                <ToolButton tool="colorfulPen" />
 
                 <ToolbarButton
                     label="Grid lines"

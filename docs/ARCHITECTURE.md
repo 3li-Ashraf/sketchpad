@@ -13,11 +13,11 @@ src/
   state/     sketchStore, the one Zustand store
   ui/
     canvas/    Canvas, CanvasRow, CanvasCell, useCellColor, usePaintGestures
-    toolbar/   Toolbar, ToolbarButton, ColorPicker, ColorfulPenIcon, useNewSketch
+    toolbar/   Toolbar, ToolbarButton, ToolButton, ColorPicker, ColorfulPenIcon, RotateRightIcon, useNewSketch
     gridSize/  GridSizeControl, GridSizeSlider, useGridResize
     files/     useSketchFiles, fileMessages
     autosave/  restoreAutosave, autosaveSession, useAutosave
-    common/    Dialog, isDialogOpen, Tooltip, panelSize
+    common/    Dialog, TextButton, isDialogOpen, Tooltip, layout
   app/       App, Header, Footer, ErrorBoundary, errorReporting, and hooks
   styles/    index.css, the Tailwind entry point and design tokens
   test/      helpers, stubs and fixtures shared by the tests
@@ -409,8 +409,9 @@ palette, fonts and animations, and `source("..")` limits class scanning to
 `src/`. Without that limit Tailwind also reads files such as this one, and
 turns words that happen to be utility names into CSS no element uses.
 
-- `.toolbar-control` is the shared look of every button, the swatch and the
-  settings toggle. Its pressed and expanded states are read from
+- `.control` is the shared look of every control: the toolbar's buttons, the
+  swatch, the settings toggle, and, through `TextButton`, the buttons of the
+  dialogs and the error screen. Its pressed and expanded states are read from
   `aria-pressed` and `aria-expanded`, so the look cannot disagree with what
   assistive technology is told.
 - Tooltips are CSS drawn from a `data-tooltip` attribute, shown on hover only

@@ -7,6 +7,8 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { TextButton } from "./TextButton";
+
 export interface ConfirmDialogProps {
     title: string;
     message: string;
@@ -37,12 +39,6 @@ interface ModalDialogProps {
     onDismiss: () => void;
     children: React.ReactNode;
 }
-
-// The toolbar's control stretched to fit a label. Both buttons look alike,
-// so neither reads as the default, and `hover:` applies only on devices that
-// can hover, so a tap does not leave a button painted.
-export const TEXT_BUTTON =
-    "toolbar-control w-auto h-auto px-4 py-2 text-sm font-medium hover:bg-accent hover:text-surface";
 
 /**
  * Open exactly while mounted, so the element can never disagree with React.
@@ -142,20 +138,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 Don't ask again
             </label>
             <div className="mt-6 flex flex-wrap justify-end gap-3">
-                <button
-                    type="button"
-                    onClick={onCancel}
-                    className={TEXT_BUTTON}
-                >
-                    Cancel
-                </button>
-                <button
-                    type="button"
-                    onClick={() => onConfirm(dontAskAgain)}
-                    className={TEXT_BUTTON}
-                >
+                <TextButton onClick={onCancel}>Cancel</TextButton>
+                <TextButton onClick={() => onConfirm(dontAskAgain)}>
                     {confirmLabel}
-                </button>
+                </TextButton>
             </div>
         </ModalDialog>
     );
@@ -171,12 +157,8 @@ export const NoticeDialog: React.FC<NoticeDialogProps> = ({
 }) => (
     <ModalDialog title={title} message={message} onDismiss={onDismiss}>
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-            <button type="button" onClick={onDismiss} className={TEXT_BUTTON}>
-                {dismissLabel}
-            </button>
-            <button type="button" onClick={onAction} className={TEXT_BUTTON}>
-                {actionLabel}
-            </button>
+            <TextButton onClick={onDismiss}>{dismissLabel}</TextButton>
+            <TextButton onClick={onAction}>{actionLabel}</TextButton>
         </div>
     </ModalDialog>
 );

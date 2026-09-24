@@ -46,7 +46,11 @@ import {
     restoreAutosave,
     type Restored,
 } from "./restoreAutosave";
-import { RESTORE_DIALOG_TITLE, useAutosave } from "./useAutosave";
+import {
+    RESTORE_DIALOG_TITLE,
+    RESTORE_WARNING,
+    useAutosave,
+} from "./useAutosave";
 
 // The real storage, over the in-memory IndexedDB, with its calls counted,
 // and the real channel between tabs, with the tab each call opened.
@@ -362,6 +366,21 @@ describe("useAutosave when opening could not read the device", () => {
 
         expect(question()).toBeInTheDocument();
         expect(writes()).toBe(0);
+    });
+
+    it("asks in words as true of a file opened since as of a drawing", async () => {
+        const { restored, answer } = await openLate();
+        render(<Autosaving restored={restored} />);
+        actions().loadSketch({
+            gridSize: 2,
+            colors: ["#123456", "#FFFFFF", "#FFFFFF", "#FFFFFF"],
+        });
+
+        await answer(EARLIER);
+
+        // Nothing was drawn: the question must not say so.
+        expect(question()).toHaveAccessibleDescription(RESTORE_WARNING);
+        expect(RESTORE_WARNING).not.toMatch(/drawn/);
     });
 
     it("puts the saved drawing back when asked to, and writes nothing", async () => {

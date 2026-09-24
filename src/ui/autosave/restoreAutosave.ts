@@ -13,11 +13,6 @@ const log = createLogger("autosave");
 /** How long opening waits for storage before starting without it. */
 export const RESTORE_TIMEOUT = 2000;
 
-export const RESTORE_DIALOG_TITLE = "Restore your saved drawing?";
-
-export const RESTORE_WARNING =
-    "Sketchpad has just found the drawing saved on this device, and you've drawn since the page opened. Restoring it replaces what you've drawn; keeping yours erases the saved one. This can't be undone.";
-
 /**
  * What the page knows of the workspace saved on the device. `restoreAutosave`
  * makes one per page and `useAutosave` keeps it up to date. It lives outside

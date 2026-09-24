@@ -313,9 +313,10 @@ can turn those questions back on, so keeping them would make them permanent.
   says so (`Restored`), and `App` hands that to `useAutosave`, which holds its
   writes and reads the device first: the late answer if it comes, or a fresh
   read before the first write. A saved drawing found then goes on the canvas
-  if nothing has been drawn since. If something has, keeping either drawing
-  erases the other, so the user is asked: Restore saved drawing, or Keep this
-  drawing, which writes it at once. Without this, the first edit on a page
+  if the canvas has not changed since, by drawing, opening a file or anything
+  else. If it has, keeping either erases the other, so the user is asked, in
+  words that name no one cause: Restore saved drawing, or Keep this drawing,
+  which writes it at once. Without this, the first edit on a page
   that opened blank would silently replace the saved drawing. `Restored` lives
   outside React, so the rule holds when a crash remounts the app.
 - **Other tabs:** every tab shares the one record, so a tab left open with an

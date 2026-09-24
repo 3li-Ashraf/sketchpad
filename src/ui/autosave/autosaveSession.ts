@@ -4,8 +4,8 @@
  *
  * A page never writes over a saved workspace it has not seen. When opening
  * could not read the device in time, the first write waits until the page has
- * read it, and when the drawing found there and one drawn since would erase
- * each other, the user chooses. Tabs also tell each other when they save, and
+ * read it, and when the drawing found there and what the canvas has come to
+ * hold since would erase each other, the user chooses. Tabs also tell each other when they save, and
  * a tab with nothing of its own waiting to be written takes up what another
  * saved, so a tab left behind cannot later write its older drawing over the
  * newer one. New sketch empties the device at once (`clearSavedWorkspace`),
@@ -50,7 +50,7 @@ const workspaceChanged = (next: SketchStore, previous: SketchStore) => {
     return partsOf(next).some((part, at) => part !== before[at]);
 };
 
-/** The choice between the drawing on the device and the one drawn since. */
+/** The choice between the drawing on the device and the canvas as it is. */
 export interface Question {
     restore: () => void;
     keep: () => void;
@@ -202,15 +202,16 @@ export const startAutosave = (
 
     /**
      * What the device held when the page could not tell at opening. It goes
-     * on the canvas if nothing has been drawn since; otherwise either drawing
-     * would erase the other, so the user chooses.
+     * on the canvas if the canvas has not changed since, by drawing, opening a
+     * file or anything else; otherwise either would erase the other, so the
+     * user chooses.
      */
     const learn = (workspace: Workspace | null) => {
         const state = useSketchStore.getState();
-        const hasDrawn =
+        const hasChanged =
             selectHasWorkToLose(state) || isStrokeOpen(state.document);
 
-        if (!workspace || !hasDrawn) {
+        if (!workspace || !hasChanged) {
             if (workspace) adopt(workspace);
             know();
             return;

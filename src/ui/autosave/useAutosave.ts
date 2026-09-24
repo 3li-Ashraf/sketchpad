@@ -12,8 +12,12 @@ import { RESTORE_SKIPPED, type Restored } from "./restoreAutosave";
 
 export const RESTORE_DIALOG_TITLE = "Restore your saved drawing?";
 
+/**
+ * Asked whenever the canvas has changed since the page opened, whether by
+ * drawing, opening a file or clearing, so it names none of them.
+ */
 export const RESTORE_WARNING =
-    "Sketchpad has just found the drawing saved on this device, and you've drawn since the page opened. Restoring it replaces what you've drawn; keeping yours erases the saved one. This can't be undone.";
+    "Sketchpad has just found the drawing saved on this device, and the canvas has changed since the page opened. Restoring the saved drawing replaces what is on the canvas now; keeping the canvas as it is erases the saved one. This can't be undone.";
 /**
  * Saves the workspace a moment after it changes, and at once when the page is
  * hidden or unloaded: a phone can end a background tab without warning.

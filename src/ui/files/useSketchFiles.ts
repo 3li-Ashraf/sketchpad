@@ -1,11 +1,11 @@
 /**
- * @file Saving, opening and exporting: the file-input dance, opening a file
- * dropped on the page, the dialog each failure raises with the next step it
- * offers, and the question asked before a file replaces a drawing. The formats
- * themselves live in `io/`.
+ * @file Saving, opening and exporting: the file-input dance, the dialog each
+ * failure raises with the next step it offers, and the question asked before
+ * a file replaces a drawing. A file dropped on the page opens as a picked one
+ * does (`useFileDrop`). The formats themselves live in `io/`.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 import type { Sketch } from "../../domain/grid";
@@ -24,7 +24,6 @@ import {
     useSketchStore,
 } from "../../state/sketchStore";
 import type { ConfirmDialogProps, NoticeDialogProps } from "../common/Dialog";
-import { isDialogOpen } from "../common/isDialogOpen";
 import { useConfirmation } from "../common/useConfirmation";
 import {
     EXPORT_FAILED,
@@ -33,6 +32,7 @@ import {
     replaceQuestion,
     SAVE_FAILED,
 } from "./fileMessages";
+import { useFileDrop } from "./useFileDrop";
 
 const SAVE_FILE_NAME = `sketch${SKETCH_FILE_EXTENSION}`;
 const PNG_FILE_NAME = "sketch.png";
@@ -61,9 +61,6 @@ interface SketchFiles {
 }
 
 const currentSketch = (): Sketch => sketchOf(useSketchStore.getState());
-
-const carriesFiles = (event: DragEvent): boolean =>
-    event.dataTransfer?.types.includes("Files") ?? false;
 
 /**
  * Failures come back as a dialog to render rather than as exceptions. The
@@ -102,27 +99,30 @@ export const useSketchFiles = (): SketchFiles => {
 
     const openSketch = useCallback(() => fileInputRef.current!.click(), []);
 
-    // Never rejects: `readSketchFile` returns every failure as a reason.
-    const loadFile = useCallback(
-        async (file: File) => {
-            const result = await readSketchFile(file);
-            if (!result.ok) {
-                setFailure({
-                    ...LOAD_FAILED[result.reason](file.name),
-                    nextStep: "open",
-                });
-                return;
-            }
+    // `readSketchFile` never rejects: it returns every failure as a reason.
+    const openFile = useCallback(
+        (file: File) => {
+            void readSketchFile(file).then((result) => {
+                if (!result.ok) {
+                    setFailure({
+                        ...LOAD_FAILED[result.reason](file.name),
+                        nextStep: "open",
+                    });
+                    return;
+                }
 
-            // Asked only once the file is known to be good, so a bad file
-            // raises its failure and nothing else.
-            const { sketch } = result;
-            runOrConfirm(replaceQuestion(file.name, sketch), () =>
-                loadSketch(sketch)
-            );
+                // Asked only once the file is known to be good, so a bad
+                // file raises its failure and nothing else.
+                const { sketch } = result;
+                runOrConfirm(replaceQuestion(file.name, sketch), () =>
+                    loadSketch(sketch)
+                );
+            });
         },
         [loadSketch, runOrConfirm]
     );
+
+    useFileDrop(openFile);
 
     const openChosenFile = useCallback(
         (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,41 +134,10 @@ export const useSketchFiles = (): SketchFiles => {
             // and cleared now because `currentTarget` is null once the event
             // has been dispatched. The `File` taken from it stays readable.
             input.value = "";
-            void loadFile(file);
+            openFile(file);
         },
-        [loadFile]
+        [openFile]
     );
-
-    // A file dropped anywhere on the page opens as if it had been picked.
-    // Left to the browser, the drop would navigate to the file and replace
-    // the page, drawing and all.
-    useEffect(() => {
-        const handleDragOver = (event: DragEvent) => {
-            if (!carriesFiles(event)) return;
-
-            event.preventDefault();
-            event.dataTransfer!.dropEffect = isDialogOpen() ? "none" : "copy";
-        };
-
-        const handleDrop = (event: DragEvent) => {
-            if (!carriesFiles(event)) return;
-
-            event.preventDefault();
-            // A question already on screen is answered first.
-            if (isDialogOpen()) return;
-
-            const file = event.dataTransfer?.files[0];
-            if (file) void loadFile(file);
-        };
-
-        window.addEventListener("dragover", handleDragOver);
-        window.addEventListener("drop", handleDrop);
-
-        return () => {
-            window.removeEventListener("dragover", handleDragOver);
-            window.removeEventListener("drop", handleDrop);
-        };
-    }, [loadFile]);
 
     const nextSteps: Record<NextStep, () => void> = {
         save: saveSketch,

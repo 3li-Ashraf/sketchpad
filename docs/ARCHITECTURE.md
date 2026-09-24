@@ -15,7 +15,7 @@ src/
     canvas/    Canvas, CanvasRow, CanvasCell, useCellColor, usePaintGestures
     toolbar/   Toolbar, ToolbarButton, ToolButton, ColorPicker, ColorfulPenIcon, RotateRightIcon, useNewSketch
     gridSize/  GridSizeControl, GridSizeSlider, useGridResize
-    files/     useSketchFiles, fileMessages
+    files/     useSketchFiles, useFileDrop, fileMessages
     autosave/  restoreAutosave, autosaveSession, useAutosave
     common/    Dialog, useConfirmation, TextButton, isDialogOpen, Tooltip, layout
   app/       App, Header, Footer, ErrorBoundary, errorReporting, and hooks

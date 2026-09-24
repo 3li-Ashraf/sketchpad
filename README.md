@@ -48,6 +48,10 @@ The browser tests run in all three engines. On a machine where one cannot
 run, name the others in `TEST_BROWSERS`, for example in an untracked
 `.env.local`: `TEST_BROWSERS=chromium,webkit`.
 
+The property tests start from a fixed seed, so every run checks the same
+cases. `TEST_SEED=<number> npm test` checks others, or replays the seed a
+failure printed.
+
 | Script                  | What it does                                                     |
 | ----------------------- | ---------------------------------------------------------------- |
 | `npm run dev`           | Vite dev server                                                  |

@@ -96,13 +96,13 @@ export default defineConfig(({ mode }) => ({
         coverage: {
             include: ["src/**/*.{ts,tsx}"],
             exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/main.tsx"],
-            // Just under what the suite reaches, so a change that leaves new
-            // code untested fails `npm run check`.
+            // All of it, which the suite reaches, so a change that leaves
+            // new code untested fails `npm run check`.
             thresholds: {
                 lines: 100,
                 functions: 100,
-                statements: 99.5,
-                branches: 98,
+                statements: 100,
+                branches: 100,
             },
         },
     },

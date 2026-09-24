@@ -200,8 +200,9 @@ touched:
 - **One subscription for every cell** (`useCellColor`). A store selector per
   cell ran 4096 of them on every change to the store, colors or not. One
   listener instead compares the colors when they change and wakes only the
-  cells whose color did, across both lengths, since a resize keeps the
-  elements of the cells whose index survives.
+  cells whose color did. It compares over the length both grids share: a
+  resize keeps the elements of the cells whose index survives, and past that
+  length a cell is either new, reading the store as it mounts, or leaving.
 - **Cells grouped in rows** (`CanvasRow`). From one flat list of 4096, React
   walked every cell to reach the one that changed. A memoized row per grid
   row, `display: contents` so its cells stay items of the grid, cuts that to
@@ -254,8 +255,9 @@ one undo away from its drawing.
   ignores the pointer, so a press cannot start a drag that would carry on
   beneath the dialog, and a key that would step it is caught first. Either one
   asks. Unlocking erases nothing by itself: the drawing goes only when the
-  slider then moves. The approval is held by the identity of the colors and
-  history arrays, so it lapses on its own at the next edit.
+  slider then moves. The approval is held by the identity of the colors
+  array, which every edit to the drawing or its history replaces, so it
+  lapses on its own at the next one.
 - **Opening a file** (`ui/files/`): the question comes only after the file has
   decoded, so a bad file reports its failure and asks nothing.
 - **New sketch** (`ui/toolbar/useNewSketch.ts`): a blank canvas at the same
@@ -513,14 +515,94 @@ fails if it logged anything it did not ask for (`src/test/logCapture.ts`): an
 entry from the logger, or a warning or error written to the console directly,
 as React does on a real problem. A test that expects an entry asserts it with
 `expectLogged(level, source, message, data)`, or `expectInvalidInput(where)`
-for a refused value. Across the whole suite, only tests that provoke a failure
-on purpose log anything.
+for a refused value, which also checks that the report says what was wrong
+and can check the value refused. Across the whole suite, only tests that
+provoke a failure on purpose log anything.
 
-Tests that guard a limit or a hazard were checked by breaking the code they
-protect and watching them fail. Examples are the inflate cap, the bounded
-read, the pixel-exact PNG and the touch gesture rule. Coverage thresholds in
-`vite.config.ts` (100% of lines and functions) make `npm run check` fail when
-new code arrives untested.
+### Properties and models
+
+Where a rule has too many cases to pick from by hand, it is checked by
+property, with [fast-check](https://fast-check.dev/): hundreds of generated
+cases, and a failing one shrunk to its smallest form. Each property compares
+the code against a second, simpler statement of the same rule:
+
+- **The document** (`sketchDocument.model.test`). Random sequences of every
+  edit, with strokes left open, bad input and all, run against a reference
+  model that keeps whole snapshots for undo, paints every reflection by brute
+  force and floods breadth-first. After every edit the two must agree on the
+  colors, the history, the open stroke and what was reported, and an edit that
+  changes nothing must hand back its document. Each document is frozen before
+  an edit sees it, so one that changed its input would throw. A second
+  property records more steps than the history keeps, then undoes and redoes
+  past the cap.
+- **Save files** (`sketchFile.test`). Any sketch comes back exactly, at every
+  width of palette index and in RGB. Any payload decodes as a reference
+  decoder, written from the format's description, says it must. A real file,
+  damaged anyhow, settles on a valid sketch or a known reason.
+- **The autosave record** (`autosave.test`). Any workspace reads back exactly,
+  and a stored record with any part replaced by anything reads back as
+  nothing or as a whole, checked workspace.
+- **The canvas** (`Canvas.test`). After any sequence of store changes, every
+  cell of every canvas mounted shows the store's color. Any press and drag,
+  on, across and off every edge, paints exactly the cells the line tracer
+  joins within each stretch on the canvas.
+
+Smaller rules are checked exhaustively instead: the line tracer between every
+pair of cells of a 12×12 grid, and the reflections of every cell and rotation
+at every size up to 8×8. Flood fill is checked by property, against a
+breadth-first search.
+
+Every property starts from one fixed seed (`src/test/property.ts`), so a run
+is the same on every machine. `TEST_SEED` in the environment picks another, to
+explore further or to replay the seed a failure printed.
+
+### The journey
+
+`app/journey.browser.test` goes through one visit in the real app, as a person
+would. It shrinks the grid, draws, fills, erases with symmetry, undoes from the
+keyboard and redoes from the toolbar, and rotates. It then saves and exports,
+resizes past the question, opens the saved file, leaves and comes back to the
+autosave, and starts a new sketch, which leaves nothing on the device. Each
+step is checked where a person would see it: in the cells on screen, in the
+files the browser wrote, or in IndexedDB.
+
+### How strong the tests are
+
+Coverage thresholds in `vite.config.ts` are 100% of lines, statements,
+functions and branches, so `npm run check` fails when new code arrives
+untested. Coverage says only that a line ran; mutation testing says whether a
+test would notice it changing. [StrykerJS](https://stryker-mutator.io/) was run
+over `src`, and every mutant that survived was either killed by a new test or
+shown to change nothing a test could see. It found, among others:
+
+- A test that passed without testing its claim: a tab asked to start over
+  "keeping its settings" had drawn with the eraser on a blank canvas, so there
+  was nothing to start over from.
+- Gaps the example tests never reached: a tab that stopped saving its own
+  edits after taking up another tab's save, a remount answering from a device
+  read made before the crash, reads doubling up while one was under way, a
+  press past the right or bottom edge of the canvas, and a surface placed
+  anywhere but the window's corner.
+- Code no test could make matter, now gone: two checks of the resize
+  approval that the third always covered; a timer cancelled, and a flag
+  cleared, where nothing could read them after; a check for a surface the
+  pointer event itself guarantees; and one for a surface with no size, which
+  the bounds check already refuses.
+
+What survives changes what the code costs, not what it does: a preallocated
+array, a cache, an early return. Or it breaks a tie between two equally near
+cells in the line tracer, or is a class only a browser lays out, which the
+mutation run does not load: it runs the `unit` and `dom` projects only. Tests
+that guard a limit or a hazard, such as the inflate cap, the bounded read, the
+pixel-exact PNG and the touch gesture rule, were also checked by hand, by
+breaking the code they protect and watching them fail.
+
+Stryker is not a dependency. Its Vitest runner (10.0) runs no tests under
+Vitest 5, which names a test in full as `suite > test` where the runner looks
+for `suite test`, so every mutant appears to survive. To run it again, patch
+`nameParts.join(' ')` to `nameParts.join(' > ')` in the runner's
+`stryker-setup.js` and `test-helpers.js`, and give it a Vitest config with the
+browser project left out.
 
 ## Build and deployment
 

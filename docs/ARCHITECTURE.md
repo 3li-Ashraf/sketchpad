@@ -38,8 +38,9 @@ this table, so a wrong-way import fails `npm run lint` with the reason. Tests
 are exempt, since they draw fixtures from `src/test/`; nothing else may
 import from there.
 
-Inside `ui/`, a folder is a feature: a component together with the hooks and
-copy that only it uses.
+Inside `ui/`, a folder is a feature: the components, hooks and words that
+only it uses. What features share, such as the dialog and the confirmation
+asked before a drawing is erased, is in `common/`.
 
 Imports are in one order everywhere, enforced by
 `eslint-plugin-simple-import-sort` and applied by `eslint --fix`: packages,

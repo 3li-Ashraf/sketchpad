@@ -1,9 +1,11 @@
 /**
- * @file Sketches to measure the save format against. They are deterministic, so
- * the size assertions in `sketchFile.test` cannot become flaky.
+ * @file Sketches and workspaces for tests. The sketches measure the save
+ * format, and are deterministic so the size assertions in `sketchFile.test`
+ * cannot become flaky.
  */
 
 import { createBlankGrid, type Sketch } from "../domain/grid";
+import type { Workspace } from "../domain/workspace";
 
 /** A seeded linear congruential generator, so every fixture is reproducible. */
 const seededRandom = (seed: number) => () =>
@@ -66,3 +68,33 @@ export const rainbowSketch = (gridSize: number): Sketch => ({
         (_, index) => `#${index.toString(16).padStart(6, "0").toUpperCase()}`
     ),
 });
+
+/**
+ * A 2×2 workspace with one step to undo and one to redo, and settings apart
+ * from the defaults, so that each part of it is seen to survive storage.
+ */
+export const smallWorkspace = (): Workspace => {
+    const pen = "#123456";
+    const colors = createBlankGrid(2);
+    colors[0] = pen;
+
+    return {
+        document: {
+            gridSize: 2,
+            colors,
+            undoStack: [[{ index: 0, before: "#FFFFFF", after: pen }]],
+            redoStack: [
+                [
+                    { index: 1, before: "#FFFFFF", after: "#ABCDEF" },
+                    { index: 3, before: "#FFFFFF", after: "#ABCDEF" },
+                ],
+            ],
+        },
+        settings: {
+            tool: "eraser",
+            penColor: pen,
+            symmetry: { topBottom: true, leftRight: false },
+            showGridLines: false,
+        },
+    };
+};

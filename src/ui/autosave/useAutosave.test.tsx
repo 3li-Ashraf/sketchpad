@@ -22,16 +22,12 @@ import {
 } from "../../domain/grid";
 import { DEFAULT_PEN_COLOR } from "../../domain/tools";
 import type { Workspace } from "../../domain/workspace";
-import {
-    clearAutosave,
-    encodeAutosave,
-    readAutosave,
-    writeAutosave,
-} from "../../io/autosave";
+import { clearAutosave, readAutosave, writeAutosave } from "../../io/autosave";
 import {
     type AutosaveChannel,
     openAutosaveChannel,
 } from "../../io/autosaveChannel";
+import { encodeAutosave } from "../../io/autosaveRecord";
 import { workspaceOf } from "../../state/sketchStore";
 import {
     deleteAutosaveDatabase,
@@ -241,8 +237,11 @@ describe("useAutosave", () => {
         render(<Autosaving />);
         actions().undo();
         actions().setGridSize(store().document.gridSize);
+        // Settings chosen again as they already are.
+        actions().setTool(store().settings.tool);
+        actions().setPenColor(store().settings.penColor);
         // A change the workspace leaves out on purpose.
-        actions().stopAskingBeforeResize();
+        actions().stopAskingBefore("resize");
 
         expect(vi.getTimerCount()).toBe(0);
         await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY);
@@ -1038,7 +1037,7 @@ describe("useAutosave when another tab starts a new sketch", () => {
             colors: createBlankGrid(8),
             undoStack: [],
         });
-        expect(store().tool).toBe("eraser");
+        expect(store().settings.tool).toBe("eraser");
         expect(writes()).toBe(1);
     });
 

@@ -17,7 +17,9 @@ import { usePaintGestures } from "./usePaintGestures";
 
 export const Canvas: React.FC = () => {
     const gridSize = useSketchStore((state) => state.document.gridSize);
-    const showGridLines = useSketchStore((state) => state.showGridLines);
+    const showGridLines = useSketchStore(
+        (state) => state.settings.showGridLines
+    );
     const { surfaceRef, surfaceProps } = usePaintGestures();
 
     // The rows depend on the grid size alone, so a stroke never rebuilds

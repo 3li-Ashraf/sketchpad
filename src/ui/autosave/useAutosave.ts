@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 
 import type { NoticeDialogProps } from "../common/Dialog";
-import { type Question, startAutosave } from "./autosaveSession";
+import { type RestoreQuestion, startAutosave } from "./autosaveSession";
 import { RESTORE_SKIPPED, type Restored } from "./restoreAutosave";
 
 export const RESTORE_DIALOG_TITLE = "Restore your saved drawing?";
@@ -32,7 +32,7 @@ export const RESTORE_WARNING =
 export const useAutosave = (
     restored: Restored = RESTORE_SKIPPED
 ): NoticeDialogProps | null => {
-    const [question, setQuestion] = useState<Question | null>(null);
+    const [question, setQuestion] = useState<RestoreQuestion | null>(null);
 
     useEffect(() => startAutosave(restored, setQuestion), [restored]);
 

@@ -23,8 +23,8 @@ import {
     store,
 } from "../../test/storeHelpers";
 import { clearSavedWorkspace } from "../autosave/autosaveSession";
-import { Toolbar } from "./Toolbar";
-import { NEW_SKETCH_DIALOG_TITLE, NEW_SKETCH_WARNING } from "./useNewSketch";
+import { Toolbar } from "../toolbar/Toolbar";
+import { NEW_SKETCH_QUESTION } from "./useNewSketch";
 
 // The session is tested in `useAutosave.test`; here only the call is watched.
 vi.mock("../autosave/autosaveSession", { spy: true });
@@ -92,8 +92,10 @@ describe("New sketch", () => {
             await userEvent.click(button("New sketch"));
 
             const dialog = await findDialog();
-            expect(dialog).toHaveAccessibleName(NEW_SKETCH_DIALOG_TITLE);
-            expect(dialog).toHaveAccessibleDescription(NEW_SKETCH_WARNING);
+            expect(dialog).toHaveAccessibleName(NEW_SKETCH_QUESTION.title);
+            expect(dialog).toHaveAccessibleDescription(
+                NEW_SKETCH_QUESTION.message
+            );
             expect(isCanvasBlank()).toBe(false);
         });
 
@@ -121,7 +123,7 @@ describe("New sketch", () => {
             expectNoDialog();
             expect(canvasColors()).toEqual(createBlankGrid(8));
             expect(button("Undo")).toBeDisabled();
-            expect(store().tool).toBe("eraser");
+            expect(store().settings.tool).toBe("eraser");
         });
 
         it("erases a cleared drawing that Undo could still bring back", async () => {
@@ -159,20 +161,20 @@ describe("New sketch", () => {
             await userEvent.click(button("New sketch"));
 
             expect(await findDialog()).toHaveAccessibleName(
-                NEW_SKETCH_DIALOG_TITLE
+                NEW_SKETCH_QUESTION.title
             );
         });
 
         it("asks independently of the resize and replace questions", async () => {
-            actions().stopAskingBeforeResize();
-            actions().stopAskingBeforeReplace();
+            actions().stopAskingBefore("resize");
+            actions().stopAskingBefore("replace");
             renderToolbar();
             paintStroke(0);
 
             await userEvent.click(button("New sketch"));
 
             expect(await findDialog()).toHaveAccessibleName(
-                NEW_SKETCH_DIALOG_TITLE
+                NEW_SKETCH_QUESTION.title
             );
         });
     });

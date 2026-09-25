@@ -8,6 +8,7 @@ import {
     SKETCH_FILE_EXTENSION,
     type SketchReadFailure,
 } from "../../io/sketchFile";
+import type { ConfirmationCopy } from "../common/useConfirmation";
 
 /** What a failure says, and the labels of its two buttons. */
 export interface FailureCopy {
@@ -66,7 +67,12 @@ export const LOAD_FAILED: Record<
     }),
 };
 
-export const replaceTitle = (fileName: string): string => `Open ${fileName}?`;
-
-export const replaceWarning = ({ gridSize }: Sketch): string =>
-    `This ${gridSize} × ${gridSize} sketch will replace your drawing and its undo history. This can't be undone.`;
+/** The question before a file replaces a drawing, naming the file and its size. */
+export const replaceQuestion = (
+    fileName: string,
+    { gridSize }: Sketch
+): ConfirmationCopy => ({
+    title: `Open ${fileName}?`,
+    message: `This ${gridSize} × ${gridSize} sketch will replace your drawing and its undo history. This can't be undone.`,
+    confirmLabel: "Replace drawing",
+});

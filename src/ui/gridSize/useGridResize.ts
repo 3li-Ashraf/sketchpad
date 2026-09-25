@@ -7,17 +7,23 @@ import { useCallback, useState } from "react";
 
 import type { SketchDocument } from "../../domain/sketchDocument";
 import {
-    selectHasWorkToLose,
+    mustAskBefore,
     type SketchStore,
     useSketchActions,
     useSketchStore,
 } from "../../state/sketchStore";
 import type { ConfirmDialogProps } from "../common/Dialog";
+import {
+    type ConfirmationCopy,
+    useConfirmation,
+} from "../common/useConfirmation";
 
-export const RESIZE_DIALOG_TITLE = "Unlock grid size?";
-
-export const RESIZE_WARNING =
-    "Changing the size will erase your drawing and its undo history. This can't be undone.";
+export const RESIZE_QUESTION: ConfirmationCopy = {
+    title: "Unlock grid size?",
+    message:
+        "Changing the size will erase your drawing and its undo history. This can't be undone.",
+    confirmLabel: "Unlock",
+};
 
 /**
  * The colors as they stood when the slider was unlocked, held by identity.
@@ -47,11 +53,10 @@ const isApproved = (
     approval: Approval | null
 ): boolean => approval === document.colors;
 
-// Cheapest first: the grid scan runs only when the flags have not settled it.
+// Cheapest first: the grid scan in `mustAskBefore` runs only when the
+// approval and the flag have not settled it.
 const isLockedFor = (state: SketchStore, approval: Approval | null): boolean =>
-    state.askBeforeResize &&
-    !isApproved(state, approval) &&
-    selectHasWorkToLose(state);
+    !isApproved(state, approval) && mustAskBefore(state, "resize");
 
 /**
  * Over a drawing the slider is locked, and the first press on it, or key that
@@ -64,10 +69,10 @@ const isLockedFor = (state: SketchStore, approval: Approval | null): boolean =>
  */
 export const useGridResize = (): GridResize => {
     const gridSize = useSketchStore((state) => state.document.gridSize);
-    const { setGridSize, stopAskingBeforeResize } = useSketchActions();
+    const { setGridSize } = useSketchActions();
+    const { confirm, dialog: resizeDialog } = useConfirmation("resize");
 
     const [approval, setApproval] = useState<Approval | null>(null);
-    const [isAsking, setIsAsking] = useState(false);
 
     const isLocked = useSketchStore((state) => isLockedFor(state, approval));
 
@@ -87,24 +92,11 @@ export const useGridResize = (): GridResize => {
     const allowResize = useCallback(() => {
         if (!isLockedFor(useSketchStore.getState(), approval)) return true;
 
-        setIsAsking(true);
+        confirm(RESIZE_QUESTION, () =>
+            setApproval(useSketchStore.getState().document.colors)
+        );
         return false;
-    }, [approval]);
-
-    const resizeDialog: ConfirmDialogProps | null = isAsking
-        ? {
-              title: RESIZE_DIALOG_TITLE,
-              message: RESIZE_WARNING,
-              confirmLabel: "Unlock",
-              onConfirm: (dontAskAgain) => {
-                  if (dontAskAgain) stopAskingBeforeResize();
-
-                  setApproval(useSketchStore.getState().document.colors);
-                  setIsAsking(false);
-              },
-              onCancel: () => setIsAsking(false),
-          }
-        : null;
+    }, [approval, confirm]);
 
     return { gridSize, isLocked, resize, allowResize, resizeDialog };
 };

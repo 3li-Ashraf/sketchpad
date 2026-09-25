@@ -138,6 +138,20 @@ export const committedDocument = ({
     redoStack,
 });
 
+/**
+ * Whether two documents have committed the same drawing and history, part by
+ * part, by identity: what `committedDocument` would give for each, compared
+ * without building it. A stroke's paint is no difference until it commits.
+ */
+export const isSameCommittedDocument = (
+    a: SketchDocument,
+    b: SketchDocument
+): boolean =>
+    a.gridSize === b.gridSize &&
+    (a.strokeBaseline ?? a.colors) === (b.strokeBaseline ?? b.colors) &&
+    a.undoStack === b.undoStack &&
+    a.redoStack === b.redoStack;
+
 /** Picks a committed document up again, with no stroke open. */
 export const resumeDocument = (
     committed: CommittedDocument

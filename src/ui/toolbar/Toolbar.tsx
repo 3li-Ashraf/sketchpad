@@ -1,7 +1,8 @@
 /**
  * @file The settings panel: every control the editor offers, wired to the
- * store. It holds no logic of its own; the grid size and file operations are
- * features of their own, in `ui/gridSize` and `ui/files`.
+ * store. It holds no logic of its own; the grid size, file operations and New
+ * sketch are features of their own, in `ui/gridSize`, `ui/files` and
+ * `ui/newSketch`.
  */
 
 import { FaRedo, FaUndo } from "react-icons/fa";
@@ -29,11 +30,11 @@ import {
 } from "../common/layout";
 import { useSketchFiles } from "../files/useSketchFiles";
 import { GridSizeControl } from "../gridSize/GridSizeControl";
+import { useNewSketch } from "../newSketch/useNewSketch";
 import { ColorPicker } from "./ColorPicker";
 import { RotateRightIcon } from "./RotateRightIcon";
 import { ToolbarButton } from "./ToolbarButton";
 import { ToolButton } from "./ToolButton";
-import { useNewSketch } from "./useNewSketch";
 
 interface ToolbarProps {
     ref?: React.Ref<HTMLElement>;
@@ -43,9 +44,13 @@ interface ToolbarProps {
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ ref, id, isOpen }) => {
-    const penColor = useSketchStore((state) => state.penColor);
-    const symmetry = useSketchStore((state) => state.symmetry);
-    const showGridLines = useSketchStore((state) => state.showGridLines);
+    // Each on its own, so switching tools, which only the tool buttons
+    // show, does not re-render the panel.
+    const penColor = useSketchStore((state) => state.settings.penColor);
+    const symmetry = useSketchStore((state) => state.settings.symmetry);
+    const showGridLines = useSketchStore(
+        (state) => state.settings.showGridLines
+    );
     const canUndo = useSketchStore(selectCanUndo);
     const canRedo = useSketchStore(selectCanRedo);
 

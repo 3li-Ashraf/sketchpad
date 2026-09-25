@@ -9,15 +9,16 @@ a line needs one; this document holds the reasoning that spans files.
 src/
   log/       the logger, which every layer may use
   domain/    pure rules: grid, color, line, tools, history, sketchDocument, workspace
-  io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosave, autosaveChannel
+  io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosaveRecord, autosave, autosaveChannel
   state/     sketchStore, the one Zustand store
   ui/
     canvas/    Canvas, CanvasRow, CanvasCell, useCellColor, usePaintGestures
-    toolbar/   Toolbar, ToolbarButton, ToolButton, ColorPicker, ColorfulPenIcon, RotateRightIcon, useNewSketch
+    toolbar/   Toolbar, ToolbarButton, ToolButton, ColorPicker, ColorfulPenIcon, RotateRightIcon
     gridSize/  GridSizeControl, GridSizeSlider, useGridResize
-    files/     useSketchFiles, fileMessages
+    files/     useSketchFiles, useFileDrop, fileMessages
+    newSketch/ useNewSketch
     autosave/  restoreAutosave, autosaveSession, useAutosave
-    common/    Dialog, TextButton, isDialogOpen, Tooltip, layout
+    common/    Dialog, useConfirmation, TextButton, isDialogOpen, Tooltip, layout
   app/       App, Header, Footer, ErrorBoundary, errorReporting, and hooks
   styles/    index.css, the Tailwind entry point and design tokens
   test/      helpers, stubs and fixtures shared by the tests
@@ -37,8 +38,9 @@ this table, so a wrong-way import fails `npm run lint` with the reason. Tests
 are exempt, since they draw fixtures from `src/test/`; nothing else may
 import from there.
 
-Inside `ui/`, a folder is a feature: a component together with the hooks and
-copy that only it uses.
+Inside `ui/`, a folder is a feature: the components, hooks and words that
+only it uses. What features share, such as the dialog and the confirmation
+asked before a drawing is erased, is in `common/`.
 
 Imports are in one order everywhere, enforced by
 `eslint-plugin-simple-import-sort` and applied by `eslint --fix`: packages,
@@ -82,11 +84,17 @@ input, so callers detect a no-op by identity.
 
 ## State
 
-`state/sketchStore.ts` holds `document` beside the editor settings: tool, pen
-color, symmetry, grid lines, and the three "ask before" flags. Each action
-applies a domain edit through one helper. When the edit returns the same
-document, the helper hands Zustand back the same state object, and Zustand then
-notifies no subscriber at all.
+`state/sketchStore.ts` holds `document`, `settings` and `askBefore`, which
+says whether each of the three actions that erase a drawing still asks first
+(see [Protecting a drawing](#protecting-a-drawing)). `settings` is the workspace's own `EditorSettings`
+(`domain/workspace.ts`): tool, pen color, symmetry and grid lines, as one
+object that every change replaces. So restoring puts it back whole, and
+autosave sees any change to it by identity alone.
+
+Each action applies a domain edit, or a change of settings, through one of two
+helpers. When nothing changes (the edit returns the same document, or a
+setting is chosen as it already is), the helper hands Zustand back the same
+state object, and Zustand then notifies no subscriber at all.
 
 Actions live on one `actions` object that is created once, so
 `useSketchActions()` never causes a re-render. Derived values come in two
@@ -251,23 +259,30 @@ drawing without an undo step. Each asks first whenever `hasWorkToLose` is
 true: a painted cell, or any history at all, since a cleared canvas is still
 one undo away from its drawing.
 
+All three ask the same way, through `useConfirmation` (`ui/common/`), each
+with its own words. `mustAskBefore(state, action)` in the store says whether
+the action has to ask: it still does, and there is something to lose.
+`runOrConfirm` then runs the action at once or asks first, and the dialog it
+returns carries "Don't ask again" through to `stopAskingBefore(action)`.
+
 - **Resizing** (`ui/gridSize/`): over a drawing the slider is locked. The input
   ignores the pointer, so a press cannot start a drag that would carry on
   beneath the dialog, and a key that would step it is caught first. Either one
   asks. Unlocking erases nothing by itself: the drawing goes only when the
-  slider then moves. The approval is held by the identity of the colors
-  array, which every edit to the drawing or its history replaces, so it
-  lapses on its own at the next one.
+  slider then moves. Unlocking is the one question asked unconditionally,
+  with `confirm`, since the lock has already said it must be. The approval is
+  held by the identity of the colors array, which every edit to the drawing or
+  its history replaces, so it lapses on its own at the next one.
 - **Opening a file** (`ui/files/`): the question comes only after the file has
   decoded, so a bad file reports its failure and asks nothing.
-- **New sketch** (`ui/toolbar/useNewSketch.ts`): a blank canvas at the same
+- **New sketch** (`ui/newSketch/`): a blank canvas at the same
   size, with no history. Clear canvas is an undo step, so it asks nothing, but
   it leaves the drawing one undo away, in memory and in the autosave; New
   sketch is how a drawing leaves the device. It clears the autosave at once
   (see [Autosave](#autosave)).
 
-"Don't ask again" sets a flag in the store, which is not autosaved, so it
-lasts until the page is reloaded.
+"Don't ask again" clears the action's entry in the store's `askBefore`,
+which is not autosaved, so it lasts until the page is reloaded.
 
 A file dropped anywhere on the page opens exactly as if it had been picked,
 question and all. Left to the browser, the drop would navigate to the file and
@@ -287,19 +302,23 @@ can turn those questions back on, so keeping them would make them permanent.
   history can outgrow `localStorage`'s few megabytes, and IndexedDB stores
   structured values without JSON. Each call opens and closes the database, so
   no connection is held that could block another tab from upgrading it.
-- **How:** the record is not the workspace as memory holds it. Each undo step
-  is stored as three typed arrays (the cells, and their colors before and
-  after as `0xRRGGBB`) instead of an object per cell. With a full history of
-  64×64 fills, the browser spent 120 to 330 ms copying those objects into
-  storage, on the main thread, at every save; the arrays copy in 2 to 6 ms,
-  and restoring fell from up to 265 ms to under 40. A step never changes once
+- **How** (`io/autosaveRecord.ts`, the only definition of the record): the
+  record is not the workspace as memory holds it. Each undo step is stored as
+  three typed arrays (the cells, and their colors before and after as
+  `0xRRGGBB`) instead of an object per cell. With a full history of 64×64
+  fills, the browser spent 120 to 330 ms copying those objects into storage,
+  on the main thread, at every save; the arrays copy in 2 to 6 ms, and
+  restoring fell from up to 265 ms to under 40. A step never changes once
   recorded, so each is converted once and remembered, by identity, and the
   steps restored are remembered as the arrays they were read from.
 - **When** (`autosaveSession` in `ui/autosave/`, which `useAutosave` starts
-  and stops): 500 ms after edits settle, so a burst writes once; at once when
-  the page is hidden or unloaded, because a phone can end a background tab
-  without warning. A save that falls due during a stroke waits for the stroke
-  to end rather than stall the drag.
+  and stops): 500 ms after edits settle, so a burst writes once, and at once
+  when the page is hidden or unloaded, because a phone can end a background
+  tab without warning. A save that falls due during a stroke waits for the
+  stroke to end rather than stall the drag. Whether an edit changed what is
+  kept is checked on every change to the store, pointer moves included, so the
+  check builds nothing: the settings compare by identity, and the document by
+  `isSameCommittedDocument`, part by part.
 - **What:** the drawing as last committed (`committedDocument`). A stroke
   still being drawn is not an undo step yet, so saving its cells would keep
   paint that undo could never take away; leaving the page mid-stroke keeps
@@ -539,7 +558,7 @@ the code against a second, simpler statement of the same rule:
   width of palette index and in RGB. Any payload decodes as a reference
   decoder, written from the format's description, says it must. A real file,
   damaged anyhow, settles on a valid sketch or a known reason.
-- **The autosave record** (`autosave.test`). Any workspace reads back exactly,
+- **The autosave record** (`autosaveRecord.test`). Any workspace reads back exactly,
   and a stored record with any part replaced by anything reads back as
   nothing or as a whole, checked workspace.
 - **The canvas** (`Canvas.test`). After any sequence of store changes, every

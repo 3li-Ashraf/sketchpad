@@ -22,6 +22,7 @@ import {
     store,
 } from "../test/storeHelpers";
 import {
+    mustAskBefore,
     selectCanRedo,
     selectCanUndo,
     selectHasWorkToLose,
@@ -36,13 +37,15 @@ describe("initial state", () => {
     it("is a blank default grid with the default tool and nothing to undo", () => {
         expect(store().document.gridSize).toBe(DEFAULT_GRID_SIZE);
         expect(canvasColors()).toEqual(createBlankGrid(DEFAULT_GRID_SIZE));
-        expect(store().tool).toBe(DEFAULT_TOOL);
-        expect(store().penColor).toBe(DEFAULT_PEN_COLOR);
-        expect(store().symmetry).toEqual(NO_SYMMETRY);
-        expect(store().showGridLines).toBe(true);
-        expect(store().askBeforeResize).toBe(true);
-        expect(store().askBeforeReplace).toBe(true);
-        expect(store().askBeforeNewSketch).toBe(true);
+        expect(store().settings.tool).toBe(DEFAULT_TOOL);
+        expect(store().settings.penColor).toBe(DEFAULT_PEN_COLOR);
+        expect(store().settings.symmetry).toEqual(NO_SYMMETRY);
+        expect(store().settings.showGridLines).toBe(true);
+        expect(store().askBefore).toEqual({
+            resize: true,
+            replace: true,
+            newSketch: true,
+        });
         expect(selectCanUndo(store())).toBe(false);
         expect(selectCanRedo(store())).toBe(false);
     });
@@ -52,7 +55,7 @@ describe("settings", () => {
     it("uppercases the pen color the native input reports", () => {
         actions().setPenColor("#3ea6ff");
 
-        expect(store().penColor).toBe("#3EA6FF");
+        expect(store().settings.penColor).toBe("#3EA6FF");
     });
 
     it.each(["red", "#fff", "", "#3EA6FF80"])(
@@ -60,7 +63,7 @@ describe("settings", () => {
         (color) => {
             actions().setPenColor(color);
 
-            expect(store().penColor).toBe(DEFAULT_PEN_COLOR);
+            expect(store().settings.penColor).toBe(DEFAULT_PEN_COLOR);
             expectInvalidInput("setPenColor");
         }
     );
@@ -68,41 +71,51 @@ describe("settings", () => {
     it("switches the tool", () => {
         actions().setTool("eraser");
 
-        expect(store().tool).toBe("eraser");
+        expect(store().settings.tool).toBe("eraser");
     });
 
     it("toggles each symmetry on its own", () => {
         actions().toggleSymmetry("topBottom");
-        expect(store().symmetry).toEqual({ topBottom: true, leftRight: false });
+        expect(store().settings.symmetry).toEqual({
+            topBottom: true,
+            leftRight: false,
+        });
 
         actions().toggleSymmetry("leftRight");
         actions().toggleSymmetry("topBottom");
-        expect(store().symmetry).toEqual({ topBottom: false, leftRight: true });
+        expect(store().settings.symmetry).toEqual({
+            topBottom: false,
+            leftRight: true,
+        });
     });
 
     it("toggles grid lines", () => {
         actions().toggleGridLines();
 
-        expect(store().showGridLines).toBe(false);
+        expect(store().settings.showGridLines).toBe(false);
     });
 
     it("stops asking each question independently, for the visit", () => {
-        actions().stopAskingBeforeResize();
-        expect(store().askBeforeResize).toBe(false);
-        expect(store().askBeforeReplace).toBe(true);
-        expect(store().askBeforeNewSketch).toBe(true);
+        actions().stopAskingBefore("resize");
+        expect(store().askBefore).toEqual({
+            resize: false,
+            replace: true,
+            newSketch: true,
+        });
 
-        actions().stopAskingBeforeReplace();
-        expect(store().askBeforeNewSketch).toBe(true);
+        actions().stopAskingBefore("replace");
+        expect(store().askBefore.newSketch).toBe(true);
 
-        actions().stopAskingBeforeNewSketch();
+        actions().stopAskingBefore("newSketch");
         actions().setGridSize(8);
         actions().loadSketch({ gridSize: 4, colors: createBlankGrid(4) });
         actions().startNewSketch();
 
-        expect(store().askBeforeResize).toBe(false);
-        expect(store().askBeforeReplace).toBe(false);
-        expect(store().askBeforeNewSketch).toBe(false);
+        expect(store().askBefore).toEqual({
+            resize: false,
+            replace: false,
+            newSketch: false,
+        });
     });
 });
 
@@ -158,8 +171,8 @@ describe("edits", () => {
 
         expect(canvasColors()).toEqual(createBlankGrid(8));
         expect(selectCanUndo(store())).toBe(false);
-        expect(store().tool).toBe("eraser");
-        expect(store().symmetry.leftRight).toBe(true);
+        expect(store().settings.tool).toBe("eraser");
+        expect(store().settings.symmetry.leftRight).toBe(true);
     });
 
     it("rotate the drawing a quarter turn clockwise", () => {
@@ -276,12 +289,15 @@ describe("restoring a workspace", () => {
 
     it("leaves the questions the workspace does not keep alone", () => {
         const workspace = saved();
-        actions().stopAskingBeforeResize();
+        actions().stopAskingBefore("resize");
 
         actions().restoreWorkspace(workspace);
 
-        expect(store().askBeforeResize).toBe(false);
-        expect(store().askBeforeReplace).toBe(true);
+        expect(store().askBefore).toEqual({
+            resize: false,
+            replace: true,
+            newSketch: true,
+        });
     });
 });
 
@@ -292,6 +308,17 @@ describe("selectors and derived values", () => {
         paintStroke(0);
 
         expect(selectHasWorkToLose(store())).toBe(true);
+    });
+
+    it("ask before an action only over a drawing, until told not to", () => {
+        expect(mustAskBefore(store(), "replace")).toBe(false);
+
+        paintStroke(0);
+        expect(mustAskBefore(store(), "replace")).toBe(true);
+
+        actions().stopAskingBefore("replace");
+        expect(mustAskBefore(store(), "replace")).toBe(false);
+        expect(mustAskBefore(store(), "newSketch")).toBe(true);
     });
 
     it("give the artwork without the editor state around it", () => {
@@ -320,6 +347,19 @@ describe("selectors and derived values", () => {
             symmetry: { topBottom: true, leftRight: false },
             showGridLines: true,
         });
+    });
+
+    it("give the settings as they are held, not a copy", () => {
+        expect(workspaceOf(store()).settings).toBe(store().settings);
+    });
+
+    it("keep the state as it is when a setting is chosen again", () => {
+        const before = store();
+
+        actions().setTool(before.settings.tool);
+        actions().setPenColor(before.settings.penColor.toLowerCase());
+
+        expect(store()).toBe(before);
     });
 
     it("keep the same actions object across updates", () => {

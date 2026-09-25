@@ -59,7 +59,7 @@ describe("tool selection", () => {
 
         await userEvent.click(button(label));
 
-        expect(store().tool).toBe(tool);
+        expect(store().settings.tool).toBe(tool);
         expect(button(label)).toHaveAttribute("aria-pressed", "true");
     });
 
@@ -81,7 +81,7 @@ describe("toggles", () => {
 
         await userEvent.click(button("Grid lines"));
 
-        expect(store().showGridLines).toBe(false);
+        expect(store().settings.showGridLines).toBe(false);
         expect(button("Grid lines")).toHaveAttribute("aria-pressed", "false");
     });
 
@@ -90,7 +90,10 @@ describe("toggles", () => {
 
         await userEvent.click(button("Top–bottom symmetry"));
 
-        expect(store().symmetry).toEqual({ topBottom: true, leftRight: false });
+        expect(store().settings.symmetry).toEqual({
+            topBottom: true,
+            leftRight: false,
+        });
         expect(button("Top–bottom symmetry")).toHaveAttribute(
             "aria-pressed",
             "true"
@@ -102,7 +105,10 @@ describe("toggles", () => {
 
         await userEvent.click(button("Left–right symmetry"));
 
-        expect(store().symmetry).toEqual({ topBottom: true, leftRight: true });
+        expect(store().settings.symmetry).toEqual({
+            topBottom: true,
+            leftRight: true,
+        });
     });
 });
 
@@ -117,7 +123,7 @@ describe("color", () => {
             }
         );
 
-        expect(store().penColor).toBe("#3EA6FF");
+        expect(store().settings.penColor).toBe("#3EA6FF");
     });
 
     it("shows the pen color in the swatch and the picker", () => {

@@ -29,7 +29,7 @@ import {
     store,
 } from "../../test/storeHelpers";
 import { GridSizeControl } from "./GridSizeControl";
-import { RESIZE_DIALOG_TITLE, RESIZE_WARNING } from "./useGridResize";
+import { RESIZE_QUESTION } from "./useGridResize";
 
 const renderControl = () => render(<GridSizeControl />);
 
@@ -109,8 +109,8 @@ describe("grid size", () => {
             const event = press();
 
             const dialog = await findDialog();
-            expect(dialog).toHaveAccessibleName(RESIZE_DIALOG_TITLE);
-            expect(dialog).toHaveAccessibleDescription(RESIZE_WARNING);
+            expect(dialog).toHaveAccessibleName(RESIZE_QUESTION.title);
+            expect(dialog).toHaveAccessibleDescription(RESIZE_QUESTION.message);
             expect(button("Unlock")).toBeInTheDocument();
             expect(event.defaultPrevented).toBe(true);
             expect(slider()).toHaveValue("32");
@@ -162,7 +162,7 @@ describe("grid size", () => {
             press();
 
             expect(await findDialog()).toHaveAccessibleName(
-                RESIZE_DIALOG_TITLE
+                RESIZE_QUESTION.title
             );
         });
 
@@ -217,7 +217,7 @@ describe("grid size", () => {
 
                 expect(pressKey(key).defaultPrevented).toBe(true);
                 expect(await findDialog()).toHaveAccessibleName(
-                    RESIZE_DIALOG_TITLE
+                    RESIZE_QUESTION.title
                 );
 
                 await userEvent.click(button("Unlock"));
@@ -266,7 +266,7 @@ describe("grid size", () => {
             press();
 
             expect(await findDialog()).toHaveAccessibleName(
-                RESIZE_DIALOG_TITLE
+                RESIZE_QUESTION.title
             );
         });
 
@@ -278,7 +278,7 @@ describe("grid size", () => {
             press();
 
             expect(await findDialog()).toHaveAccessibleName(
-                RESIZE_DIALOG_TITLE
+                RESIZE_QUESTION.title
             );
         });
 
@@ -310,7 +310,7 @@ describe("grid size", () => {
             press();
 
             expect(await findDialog()).toHaveAccessibleName(
-                RESIZE_DIALOG_TITLE
+                RESIZE_QUESTION.title
             );
         });
     });

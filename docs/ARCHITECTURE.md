@@ -8,7 +8,7 @@ a line needs one; this document holds the reasoning that spans files.
 ```
 src/
   log/       the logger, which every layer may use
-  domain/    pure rules: grid, color, line, tools, history, sketchDocument, workspace
+  domain/    pure rules: grid, color, line, tools, history, sketchDocument, workspace, invalidInput
   io/        browser I/O over plain data: sketchFile, compression, pngExport, fileDownload, autosaveRecord, autosave, autosaveChannel
   state/     sketchStore, the one Zustand store
   ui/

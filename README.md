@@ -29,7 +29,8 @@ Tailwind CSS. It runs at <https://3li-ashraf.github.io/sketchpad>.
   older drawing over newer work, and a saved drawing that is slow to load is
   never erased unasked.
 - **No lost work**: resizing the grid, opening a file or starting a new
-  sketch asks first whenever it would erase a drawing. "Don't ask again" lasts until the page is reloaded.
+  sketch asks first whenever it would erase a drawing. "Don't ask again"
+  lasts until the page is reloaded.
 
 ## Getting started
 
@@ -79,7 +80,8 @@ src/
   io/       browser I/O: the .skpd format, compression, PNG export, downloads,
             the autosave record and the channel between tabs
   state/    the Zustand store, which applies domain edits
-  ui/       canvas/, toolbar/, gridSize/, files/, autosave/ and common/
+  ui/       canvas/, toolbar/, gridSize/, files/, newSketch/, autosave/ and
+            common/
   app/      the shell that lays them out, and catches crashes
 ```
 
